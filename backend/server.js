@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
-const sgMail = require("nodemailer");
+const { Resend } = require("resend");
 const ExcelJS = require("exceljs");
 const sanitize = require("sanitize-filename");
 require("dotenv").config();
