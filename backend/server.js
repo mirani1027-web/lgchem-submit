@@ -173,6 +173,25 @@ function makeAttachment(file) {
 }
 
 app.get("/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+app.get("/test-mail, async (req, res) => {
+ try {
+   const resend = new Resend(process.env.RESEND_API_KEY);
+
+   const result = await resend.emails.send({
+     from: process.env.MAIL_FROM,
+     to: process.env.MAIL_TO,
+     subject: "Resend 테스트",
+     text: "메일 발송 테스트입니다."
+   });
+
+   res.json(result);
+ } catch (err) {
+   console.error(err);
+   res.status(500).json({
+     error: err.message
+   });
+ }
+});
 
 app.post("/submit", upload.any(), async (req, res) => {
  try {
