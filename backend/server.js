@@ -173,7 +173,7 @@ function makeAttachment(file) {
 }
 
 app.get("/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
-app.get("/test-mail, async (req, res) => {
+app.get("/test-mail", async (req, res) => {
  try {
    const resend = new Resend(process.env.RESEND_API_KEY);
 
