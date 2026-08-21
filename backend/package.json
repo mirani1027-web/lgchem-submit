@@ -8,7 +8,7 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "resend": "^4.x",
+    "resend": "^4.0.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "exceljs": "^4.4.0",
