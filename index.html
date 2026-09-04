@@ -827,34 +827,6 @@ document.getElementById("salesAmount").addEventListener("input",function(){
 
 function updateSerial(){
 
-  const p=new URLSearchParams(window.location.search),id=p.get('id');
-
-  if(id){
-
-    document.getElementById("serialDisplay").textContent=id;
-
-    document.getElementById("serialNumber").value=id;
-
-    const kv=document.getElementById("keyValue");if(kv)kv.value=id;
-
-    const parts=id.split('-');
-
-    if(parts.length>=2){
-
-      const m=MATERIAL_PROCESS_MAP[parts[1].toUpperCase()];
-
-      if(m){
-
-        document.getElementById("handlingMaterials").value=m.material;
-
-        document.getElementById("handlingProcess").value=m.process;
-
-      }
-
-    }
-
-  }
-
   updateMailSubject();
 
 }
@@ -1242,32 +1214,87 @@ document.getElementById("resetBtn").addEventListener("click",()=>{
 startInput.addEventListener("change",updateProgress);
 
  
-
 function initPage(){
 
-  const p=new URLSearchParams(window.location.search);
+  const p = new URLSearchParams(window.location.search);
 
-  const id=p.get('id'),comp=p.get('comp');
+  const id = p.get('id');
+
+  const comp = p.get('comp');
+
+ 
+
+
 
   if(id){
 
-    ["keyValue","serialNumber"].forEach(k=>{const e=document.getElementById(k);if(e)e.value=id;});
+    const kv = document.getElementById("keyValue");
 
-    const sd=document.getElementById("serialDisplay");if(sd)sd.textContent=id;
+    if(kv) kv.value = id;
+
+    const sn = document.getElementById("serialNumber");
+
+    if(sn) sn.value = id;
+
+    const sd = document.getElementById("serialDisplay");
+
+    if(sd) sd.textContent = id;
+
+ 
+
+
+    const parts = id.split('-');
+
+    if(parts.length >= 2){
+
+      const code = parts[1].toUpperCase();
+
+      const m = MATERIAL_PROCESS_MAP[code];
+
+      if(m){
+
+        const hm = document.getElementById("handlingMaterials");
+
+        const hp = document.getElementById("handlingProcess");
+
+        if(hm) hm.value = m.material;
+
+        if(hp) hp.value = m.process;
+
+      }
+
+    }
 
   }
 
   if(comp){
 
-    const el=document.getElementById("companyName");
+    const el = document.getElementById("companyName");
 
-    if(el){el.value=decodeURIComponent(comp);el.readOnly=true;el.classList.add("readonly-field");}
+    if(el){
+
+      el.value = comp;
+
+      el.readOnly = true;
+
+      el.classList.add("readonly-field");
+
+    }
 
   }
 
-  renderFiles();renderSteps();updateProgress();updateSerial();
+ 
+
+  renderFiles();
+
+  renderSteps();
+
+  updateProgress();
+
+  updateMailSubject();
 
 }
+
 
 initPage();
 
