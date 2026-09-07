@@ -1,4 +1,3 @@
-
 const express = require("express");
 
 const cors = require("cors");
@@ -10,6 +9,8 @@ const { Resend } = require("resend");
 const sanitize = require("sanitize-filename");
 
 const PDFDocument = require("pdfkit");
+
+const path = require("path");
 
 require("dotenv").config();
 
@@ -49,23 +50,23 @@ app.use(cors({
 
 const FIELD_RULES = {
 
-  businessLicense:      { label: "사업자등록증",        required: true,  maxMB: 1,  ext: ["jpg","jpeg","png"] },
+  businessLicense:       { label: "사업자등록증",        required: true,  maxMB: 1,  ext: ["jpg","jpeg","png"] },
 
-  vatCertificate:       { label: "부가가치세표준증명원", required: true,  maxMB: 1,  ext: ["jpg","jpeg","png"] },
+  vatCertificate:        { label: "부가가치세표준증명원", required: true,  maxMB: 1,  ext: ["jpg","jpeg","png"] },
 
-  contract:             { label: "계약서",               required: true,  maxMB: 5,  ext: ["pdf"] },
+  contract:              { label: "계약서",               required: true,  maxMB: 5,  ext: ["pdf"] },
 
-  pledge:               { label: "확약서",               required: false, maxMB: 1,  ext: ["pdf"] },
+  pledge:                { label: "확약서",               required: false, maxMB: 1,  ext: ["pdf"] },
 
-  manpowerList:         { label: "수급인인력명세서",     required: true,  maxMB: 1,  ext: ["pdf"] },
+  manpowerList:          { label: "수급인인력명세서",     required: true,  maxMB: 1,  ext: ["pdf"] },
 
-  trainingCertificate:  { label: "교육이수증",           required: true,  maxMB: 20, ext: ["pdf","zip"] },
+  trainingCertificate:   { label: "교육이수증",           required: true,  maxMB: 20, ext: ["pdf","zip"] },
 
-  employmentCertificate:{ label: "재직증명서",           required: true,  maxMB: 1,  ext: ["pdf"] },
+  employmentCertificate: { label: "재직증명서",           required: true,  maxMB: 1,  ext: ["pdf"] },
 
-  ppeList:              { label: "보호구명세서",         required: true,  maxMB: 1,  ext: ["pdf"] },
+  ppeList:               { label: "보호구명세서",         required: true,  maxMB: 1,  ext: ["pdf"] },
 
-  ppeCertificate:       { label: "보호구인증서",         required: true,  maxMB: 5,  ext: ["pdf","zip"] }
+  ppeCertificate:        { label: "보호구인증서",         required: true,  maxMB: 5,  ext: ["pdf","zip"] }
 
 };
 
@@ -77,17 +78,7 @@ const upload = multer({
 
   storage: multer.memoryStorage(),
 
-  limits: {
-
-    fileSize: 20 * 1024 * 1024,
-
-    files: 9,
-
-    fields: 120,
-
-    parts: 140
-
-  }
+  limits: { fileSize: 20 * 1024 * 1024, files: 9, fields: 120, parts: 140 }
 
 });
 
@@ -97,15 +88,11 @@ const upload = multer({
 
 function pad(n) { return String(n).padStart(2, "0"); }
 
- 
-
 function yyyymmdd(date = new Date()) {
 
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
+  return `${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}`;
 
 }
-
- 
 
 function dotDate(iso) {
 
@@ -115,15 +102,11 @@ function dotDate(iso) {
 
 }
 
- 
-
 function safeName(value) {
 
   return sanitize(String(value || "").replace(/\s+/g, "_")).slice(0, 80) || "미입력";
 
 }
-
- 
 
 function getExt(filename) {
 
@@ -132,8 +115,6 @@ function getExt(filename) {
   return parts.length > 1 ? parts.pop().toLowerCase() : "";
 
 }
-
- 
 
 function filesByField(reqFiles) {
 
@@ -144,8 +125,6 @@ function filesByField(reqFiles) {
   return out;
 
 }
-
- 
 
 function formatCurrency(val) {
 
@@ -169,13 +148,7 @@ function validateFiles(fileMap) {
 
     const file = fileMap[key];
 
-    if (rule.required && !file) {
-
-      errors.push(`${rule.label} 파일이 없습니다.`);
-
-      continue;
-
-    }
+    if (rule.required && !file) { errors.push(`${rule.label} 파일이 없습니다.`); continue; }
 
     if (!file) continue;
 
@@ -205,17 +178,11 @@ function buildSubmission(body, receiptId) {
 
   try { workSteps = JSON.parse(body.workStepsJson || "[]"); } catch (_) {}
 
- 
-
   const keyValue = body.keyValue || body.serialNumber || receiptId;
-
- 
 
   return {
 
-    receiptId,
-
-    keyValue,
+    receiptId, keyValue,
 
     submitDate: yyyymmdd(),
 
@@ -233,11 +200,7 @@ function buildSubmission(body, receiptId) {
 
     mainProduct:     body.mainProduct     || "",
 
-    salesAmount:     body.salesAmountFormatted
-
-                       ? body.salesAmountFormatted
-
-                       : formatCurrency(body.salesAmount),
+    salesAmount:     body.salesAmountFormatted ? body.salesAmountFormatted : formatCurrency(body.salesAmount),
 
     establishYear:   body.establishYear   || "",
 
@@ -245,21 +208,21 @@ function buildSubmission(body, receiptId) {
 
     businessField:   body.businessField   || "",
 
-    contractTitle:     body.contractTitle     || "",
+    contractTitle:   body.contractTitle   || "",
 
-    contractStart:     body.contractStart     || "",
+    contractStart:   body.contractStart   || "",
 
-    workerCount:       body.workerCount       || "",
+    workerCount:     body.workerCount     || "",
 
     handlingMaterials: body.handlingMaterials || "",
 
     handlingProcess:   body.handlingProcess   || "",
 
-    submitterName:  body.submitterName  || "",
+    submitterName:   body.submitterName   || "",
 
-    submitterPhone: body.submitterPhoneFormatted || body.submitterPhone || "",
+    submitterPhone:  body.submitterPhoneFormatted || body.submitterPhone || "",
 
-    submitterEmail: body.submitterEmail || "",
+    submitterEmail:  body.submitterEmail  || "",
 
     safetyManagerName:     body.safetyManagerName     || "",
 
@@ -279,23 +242,13 @@ function buildSubmission(body, receiptId) {
 
 const FILE_LABEL_MAP = {
 
-  contract:             "계약서",
+  contract: "계약서", pledge: "확약서", manpowerList: "수급인인력명세서",
 
-  pledge:               "확약서",
+  trainingCertificate: "교육이수증", employmentCertificate: "재직증명서",
 
-  manpowerList:         "수급인인력명세서",
-
-  trainingCertificate:  "교육이수증",
-
-  employmentCertificate:"재직증명서",
-
-  ppeList:              "보호구명세서",
-
-  ppeCertificate:       "보호구인증서"
+  ppeList: "보호구명세서", ppeCertificate: "보호구인증서"
 
 };
-
- 
 
 function makeAttachment(file, keyValue) {
 
@@ -317,31 +270,13 @@ function makeAttachment(file, keyValue) {
 
  
 
-/* ===================== PDF 유틸 ===================== */
-
-function streamToBuffer(stream) {
-
-  return new Promise((resolve, reject) => {
-
-    const chunks = [];
-
-    stream.on("data", chunk => chunks.push(chunk));
-
-    stream.on("end", () => resolve(Buffer.concat(chunks)));
-
-    stream.on("error", reject);
-
-  });
-
-}
-
- 
+/* ===================== PDF 공통 ===================== */
 
 function newDoc() {
 
   const doc = new PDFDocument({ size: "A4", margin: 50 });
 
-  doc.registerFont("Korean", "./fonts/malgun.ttf");
+  doc.registerFont("Korean", path.join(__dirname, "fonts", "malgun.ttf"));
 
   doc.font("Korean");
 
@@ -351,229 +286,229 @@ function newDoc() {
 
  
 
-/* ===================== PDF 공통: 표 행 그리기 ===================== */
-
-function drawTableRow(doc, y, col1W, col2W, label, value, rowH = 26) {
-
-  // 라벨 셀
-
-  doc.rect(50, y, col1W, rowH).stroke();
-
-  doc.fontSize(9).fillColor("#475569")
-
-     .text(label, 54, y + 8, { width: col1W - 8, lineBreak: false });
-
- 
-
-  // 값 셀
-
-  doc.rect(50 + col1W, y, col2W, rowH).stroke();
-
-  doc.fontSize(9).fillColor("#0f172a")
-
-     .text(String(value || "-"), 54 + col1W, y + 8, { width: col2W - 8, lineBreak: false });
-
- 
-
-  return y + rowH;
-
-}
-
- 
-
-/* ===================== PDF 공통: 섹션 헤더 ===================== */
-
-function drawSectionHeader(doc, y, width, title) {
-
-  doc.rect(50, y, width, 22).fill("#1e3a8a");
-
-  doc.fontSize(10).fillColor("#ffffff")
-
-     .text(title, 54, y + 6, { width: width - 8, lineBreak: false });
-
-  doc.fillColor("#0f172a");
-
-  return y + 22;
-
-}
-
- 
-
 /* ===================== PDF 1: 수급인 정보 ===================== */
 
 async function createPdf1(s, fileMap) {
 
-  const doc = newDoc();
+  return new Promise((resolve, reject) => {
 
-  const buf = streamToBuffer(doc);
+    const doc = newDoc();
 
- 
+    const chunks = [];
 
-  const pageW = doc.page.width - 100; // 양쪽 마진 50씩
+    doc.on("data", c => chunks.push(c));
 
-  const col1  = 130;
+    doc.on("end",  () => resolve(Buffer.concat(chunks)));
 
-  const col2  = pageW - col1;
-
- 
-
-  // 제목
-
-  doc.fontSize(14).fillColor("#0f172a")
-
-     .text("3. 수급인", 50, 50);
+    doc.on("error", reject);
 
  
 
-  let y = 80;
+    const L     = 50;
+
+    const pageW = 495;
+
+    const ROW_H = 25;
 
  
 
-  // 섹션: 업체 정보
+    function cell(x, cy, w, h, text, fs = 9) {
 
-  y = drawSectionHeader(doc, y, pageW, "업체 기본정보");
+      doc.save();
 
-  y = drawTableRow(doc, y, col1, col2, "업체명",         s.companyName);
+      doc.lineWidth(0.75).rect(x, cy, w, h).stroke("#000");
 
-  y = drawTableRow(doc, y, col1, col2, "대표자",         s.ceoName);
+      doc.restore();
 
-  y = drawTableRow(doc, y, col1, col2, "설립연도",       s.establishYear + "년");
+      doc.fontSize(fs);
 
-  y = drawTableRow(doc, y, col1, col2, "업종",           s.businessType);
+      const lineH = doc.currentLineHeight(true);
 
-  y = drawTableRow(doc, y, col1, col2, "사업장 주소",    s.businessAddress);
+      const textY = cy + (h / 2) - (lineH / 2);
 
-  y = drawTableRow(doc, y, col1, col2, "사업분야",       s.businessField);
+      doc.fillColor("#0f172a")
 
-  y = drawTableRow(doc, y, col1, col2, "매출액",         s.salesAmount);
+         .text(String(text || "-"), x + 4, textY,
 
-  y = drawTableRow(doc, y, col1, col2, "주요 생산품",    s.mainProduct);
+           { width: w - 8, lineBreak: false, ellipsis: true });
 
-  y = drawTableRow(doc, y, col1, col2, "작업인원",       s.workerCount + "명");
-
- 
-
-  // 안전관리자 행 (3분할)
-
-  y = drawSectionHeader(doc, y + 8, pageW, "안전관리 담당자");
-
-  const third = pageW / 3;
+    }
 
  
 
-  doc.rect(50,           y, third, 26).stroke();
+    /* 상단 굵은 선 */
 
-  doc.rect(50 + third,   y, third, 26).stroke();
+    doc.moveTo(L, 60).lineTo(L + pageW, 60).lineWidth(1.25).strokeColor("#000").stroke();
 
-  doc.rect(50 + third*2, y, third, 26).stroke();
-
- 
-
-  doc.fontSize(9).fillColor("#475569")
-
-     .text("성명", 54, y + 8, { width: 40, lineBreak: false });
-
-  doc.fillColor("#0f172a")
-
-     .text(s.safetyManagerName || "-", 54 + 30, y + 8, { width: third - 38, lineBreak: false });
+    doc.fontSize(13).fillColor("#0f172a").text("3.  수급인", L, 68);
 
  
 
-  doc.fillColor("#475569")
+    let y = 100;
 
-     .text("직급", 54 + third, y + 8, { width: 40, lineBreak: false });
-
-  doc.fillColor("#0f172a")
-
-     .text(s.safetyManagerPosition || "-", 54 + third + 30, y + 8, { width: third - 38, lineBreak: false });
+    doc.moveTo(L, y).lineTo(L + pageW, y).lineWidth(1.25).stroke();
 
  
 
-  doc.fillColor("#475569")
-
-     .text("연락처", 54 + third*2, y + 8, { width: 40, lineBreak: false });
-
-  doc.fillColor("#0f172a")
-
-     .text(s.safetyManagerPhone || "-", 54 + third*2 + 40, y + 8, { width: third - 48, lineBreak: false });
+    const c1 = 90, c2 = 130, c3 = 80, c4 = pageW - c1 - c2 - c3;
 
  
 
-  y += 34;
+    /* 행1: 업체명 | 값 | 대표자명 | 값 */
+
+    cell(L,          y, c1, ROW_H, "업체명");
+
+    cell(L+c1,       y, c2, ROW_H, s.companyName);
+
+    cell(L+c1+c2,    y, c3, ROW_H, "대표자명");
+
+    cell(L+c1+c2+c3, y, c4, ROW_H, s.ceoName);
+
+    y += ROW_H;
 
  
 
-  // 이미지 2칸 영역
+    /* 행2: 설립연도 | 값 | 업종 | 값 */
 
-  const imgAreaH = 280;
+    cell(L,          y, c1, ROW_H, "설립연도");
 
-  const halfW    = pageW / 2;
+    cell(L+c1,       y, c2, ROW_H, s.establishYear);
 
- 
+    cell(L+c1+c2,    y, c3, ROW_H, "업종");
 
-  doc.rect(50,          y, halfW, imgAreaH).stroke();
+    cell(L+c1+c2+c3, y, c4, ROW_H, s.businessType);
 
-  doc.rect(50 + halfW,  y, halfW, imgAreaH).stroke();
-
- 
-
-  // 이미지 제목
-
-  doc.fontSize(10).fillColor("#1e3a8a")
-
-     .text("사업자등록증",         50,          y + 8, { width: halfW, align: "center" })
-
-     .text("부가가치세표준증명원", 50 + halfW,  y + 8, { width: halfW, align: "center" });
+    y += ROW_H;
 
  
 
-  // 실제 이미지 삽입
+    /* 행3: 사업장 주소 */
 
-  const pad2 = 20;
+    cell(L,    y, c1,         ROW_H, "사업장 주소");
 
-  const imgW  = halfW - pad2 * 2;
+    cell(L+c1, y, pageW - c1, ROW_H, s.businessAddress);
 
-  const imgH  = imgAreaH - 30;
-
- 
-
-  if (fileMap["businessLicense"]) {
-
-    try {
-
-      doc.image(fileMap["businessLicense"].buffer,
-
-        50 + pad2, y + 24,
-
-        { width: imgW, height: imgH, fit: [imgW, imgH] }
-
-      );
-
-    } catch(_) {}
-
-  }
-
-  if (fileMap["vatCertificate"]) {
-
-    try {
-
-      doc.image(fileMap["vatCertificate"].buffer,
-
-        50 + halfW + pad2, y + 24,
-
-        { width: imgW, height: imgH, fit: [imgW, imgH] }
-
-      );
-
-    } catch(_) {}
-
-  }
+    y += ROW_H;
 
  
 
-  doc.end();
+    /* 행4: 안전관리 담당자 */
 
-  return buf;
+    const sL1=90, sL2=50, sV1=70, sL3=50, sV2=70, sL4=50,
+
+          sV3=pageW-sL1-sL2-sV1-sL3-sV2-sL4;
+
+    cell(L,                          y, sL1, ROW_H, "안전관리 담당자", 9);
+
+    cell(L+sL1,                      y, sL2, ROW_H, "성명",           9);
+
+    cell(L+sL1+sL2,                  y, sV1, ROW_H, s.safetyManagerName, 9);
+
+    cell(L+sL1+sL2+sV1,              y, sL3, ROW_H, "직급",           9);
+
+    cell(L+sL1+sL2+sV1+sL3,         y, sV2, ROW_H, s.safetyManagerPosition, 9);
+
+    cell(L+sL1+sL2+sV1+sL3+sV2,     y, sL4, ROW_H, "연락처",         9);
+
+    cell(L+sL1+sL2+sV1+sL3+sV2+sL4, y, sV3, ROW_H, s.safetyManagerPhone, 9);
+
+    y += ROW_H;
+
+ 
+
+    /* 행5~8: 라벨 | 값 */
+
+    const lW = c1, vW = pageW - lW;
+
+    for (const [label, value] of [
+
+      ["임직원수",   s.workerCount + "명"],
+
+      ["사업분야",   s.businessField],
+
+      ["매출액",     s.salesAmount],
+
+      ["주요생산품", s.mainProduct],
+
+    ]) {
+
+      cell(L,      y, lW, ROW_H, label);
+
+      cell(L + lW, y, vW, ROW_H, value);
+
+      y += ROW_H;
+
+    }
+
+ 
+
+    /* 주요생산품 아래 굵은 선 */
+
+    doc.moveTo(L, y).lineTo(L + pageW, y).lineWidth(1.25).stroke();
+
+    y += 16;
+
+ 
+
+    /* 이미지 제목 행 */
+
+    const halfW = pageW / 2;
+
+    doc.lineWidth(0.75);
+
+    doc.rect(L,         y, halfW, 24).stroke();
+
+    doc.rect(L + halfW, y, halfW, 24).stroke();
+
+    doc.fontSize(10).fillColor("#0f172a")
+
+       .text("사업자등록증",          L,         y + 7, { width: halfW, align: "center" })
+
+       .text("부가가치세과세표준증명", L + halfW, y + 7, { width: halfW, align: "center" });
+
+    y += 24;
+
+ 
+
+    /* 이미지 영역 */
+
+    const imgAreaH = doc.page.height - y - 50;
+
+    doc.rect(L,         y, halfW, imgAreaH).stroke();
+
+    doc.rect(L + halfW, y, halfW, imgAreaH).stroke();
+
+ 
+
+    if (fileMap["businessLicense"]) {
+
+      try {
+
+        doc.image(fileMap["businessLicense"].buffer,
+
+          L + 5, y + 5, { fit: [halfW - 10, imgAreaH - 10] });
+
+      } catch(_) {}
+
+    }
+
+    if (fileMap["vatCertificate"]) {
+
+      try {
+
+        doc.image(fileMap["vatCertificate"].buffer,
+
+          L + halfW + 5, y + 5, { fit: [halfW - 10, imgAreaH - 10] });
+
+      } catch(_) {}
+
+    }
+
+ 
+
+    doc.end();
+
+  });
 
 }
 
@@ -583,93 +518,177 @@ async function createPdf1(s, fileMap) {
 
 async function createPdf2(s) {
 
-  const doc = newDoc();
+  return new Promise((resolve, reject) => {
 
-  const buf = streamToBuffer(doc);
+    const doc = newDoc();
 
- 
+    const chunks = [];
 
-  const pageW = doc.page.width - 100;
+    doc.on("data", c => chunks.push(c));
 
-  const col1  = 160;
+    doc.on("end",  () => resolve(Buffer.concat(chunks)));
 
-  const col2  = pageW - col1;
-
- 
-
-  // 제목
-
-  doc.fontSize(13).fillColor("#0f172a")
-
-     .text("[붙임3] 도급계획서", 50, 50, { width: pageW, align: "center" });
+    doc.on("error", reject);
 
  
 
-  let y = 90;
+    const L    = 50;
+
+    const pageW = 495;
+
+    const col1  = 160;
+
+    const col2  = pageW - col1;
 
  
 
-  // 작업절차 텍스트 변환
+    doc.fontSize(13).fillColor("#0f172a")
 
-  const processText = (s.workSteps || [])
-
-    .map(step => `${step.step}. ${step.title}\n   ${step.detail}`)
-
-    .join("\n");
+       .text("[붙임3]  도급계획서", L, 60);
 
  
 
-  // 일반 행 (높이 자동 계산)
-
-  function drawAutoRow(label, value) {
-
-    const textH = doc.heightOfString(String(value || "-"), { width: col2 - 16 });
-
-    const rowH  = Math.max(32, textH + 16);
+    let y = 100;
 
  
 
-    doc.rect(50,          y, col1,  rowH).stroke();
+    /* 상단 굵은 선 */
 
-    doc.rect(50 + col1,   y, col2,  rowH).stroke();
-
- 
-
-    doc.fontSize(9).fillColor("#475569")
-
-       .text(label, 54, y + (rowH / 2) - 6, { width: col1 - 8, lineBreak: false });
+    doc.moveTo(L, y).lineTo(L + pageW, y).lineWidth(1.25).strokeColor("#000").stroke();
 
  
 
-    doc.fontSize(9).fillColor("#0f172a")
+    /* 헤더 행 */
 
-       .text(String(value || "-"), 54 + col1, y + 8, { width: col2 - 16 });
+    const headerH = 32;
 
- 
+    doc.lineWidth(0.75)
 
-    y += rowH;
+       .moveTo(L + col1, y).lineTo(L + col1, y + headerH).stroke();
 
-  }
+    doc.moveTo(L, y + headerH).lineTo(L + pageW, y + headerH).lineWidth(1.25).stroke();
 
- 
+    doc.fontSize(11).fillColor("#0f172a")
 
-  drawAutoRow("수급업체명",                s.companyName);
+       .text("구  분",   L,      y + 10, { width: col1, align: "center" })
 
-  drawAutoRow("도급대상 단위공장명 및 장소", s.handlingProcess);
+       .text("세부내용", L+col1, y + 10, { width: col2, align: "center" });
 
-  drawAutoRow("도급대상 시설·설비·장치 종류", s.handlingProcess);
-
-  drawAutoRow("도급내용",                  s.contractTitle);
-
-  drawAutoRow("대상시설별 작업 프로세스",  processText);
-
-  drawAutoRow("도급 사유",                 "전문성을 가진 업체에 도급하여 안전성을 확보하고자 함.");
+    y += headerH;
 
  
 
-  doc.end();
+    /* 작업절차 텍스트 */
 
-  return buf;
+    const processText = (s.workSteps || [])
+
+      .map(st => `${st.step}.  ${st.title}\n    ${st.detail}`)
+
+      .join("\n");
+
+ 
+
+    const procBaseH = doc.heightOfString(processText, { width: col2 - 24 });
+
+    const procRowH  = Math.round(Math.max(120, procBaseH + 24) * 1.3);
+
+ 
+
+    function autoRow(label, value, minH, centerValue) {
+
+      const th   = doc.heightOfString(String(value || "-"), { width: col2 - 20 });
+
+      const rowH = Math.max(minH, th + 24);
+
+ 
+
+      doc.lineWidth(0.75)
+
+         .moveTo(L + col1, y).lineTo(L + col1, y + rowH).stroke();
+
+      doc.moveTo(L, y + rowH).lineTo(L + pageW, y + rowH).stroke();
+
+ 
+
+      const labelH = doc.heightOfString(String(label), { width: col1 - 8 });
+
+      doc.fontSize(10).fillColor("#0f172a")
+
+         .text(String(label), L, y + (rowH / 2) - (labelH / 2),
+
+           { width: col1, align: "center" });
+
+ 
+
+      if (centerValue) {
+
+        const valH = doc.heightOfString(String(value || "-"), { width: col2 - 20 });
+
+        doc.fontSize(10).fillColor("#0f172a")
+
+           .text(String(value || "-"),
+
+                 L + col1 + 10, y + (rowH / 2) - (valH / 2),
+
+                 { width: col2 - 20, align: "center" });
+
+      } else {
+
+        doc.fontSize(10).fillColor("#0f172a")
+
+           .text(String(value || "-"),
+
+                 L + col1 + 14, y + 14,
+
+                 { width: col2 - 24 });
+
+      }
+
+      y += rowH;
+
+    }
+
+ 
+
+    autoRow("수급업체명",                  s.companyName,    40,       true);
+
+    autoRow("도급대상 단위공장명 및 장소", s.handlingProcess, 50,       true);
+
+    autoRow("도급대상 시설·설비·장치 종류", s.handlingProcess, 50,      true);
+
+    autoRow("도급내용",                    s.contractTitle,  40,       true);
+
+    autoRow("대상시설별 작업 프로세스",    processText,      procRowH, false);
+
+    autoRow("도급 사유",
+
+      "전문성을 가진 업체에 도급하여 안전성을 확보하고자 함.", 60, true);
+
+ 
+
+    /* 하단 굵은 선 */
+
+    doc.moveTo(L, y).lineTo(L + pageW, y).lineWidth(1.25).stroke();
+
+    y += 24;
+
+ 
+
+    /* 별첨 */
+
+    doc.fontSize(10).fillColor("#0f172a")
+
+       .text("2.  수급인이 보유한 개인보호장구 명세서 (별첨1)", L, y);
+
+    y += 30;
+
+    doc.text("3.  수급인의 취급시설 및 인력명세서 (별첨2)", L, y);
+
+ 
+
+    doc.end();
+
+  });
 
 }
 
@@ -707,7 +726,7 @@ function fileStatusRows(fileMap, keyValue) {
 
  
 
-/* ===================== 1/2 메일 HTML 본문 ===================== */
+/* ===================== 1/2 메일 HTML ===================== */
 
 function buildHtml1(s, fileMap) {
 
@@ -721,8 +740,6 @@ function buildHtml1(s, fileMap) {
 
     </tr>`;
 
- 
-
   const sec = (title) => `
 
     <tr>
@@ -730,8 +747,6 @@ function buildHtml1(s, fileMap) {
       <td colspan="2" style="padding:8px 12px;background:#1e3a8a;color:#fff;font-size:12px;font-weight:900;border:1px solid #1e3a8a;">${title}</td>
 
     </tr>`;
-
- 
 
   return `
 
@@ -747,75 +762,63 @@ function buildHtml1(s, fileMap) {
 
     </div>
 
- 
-
     <table style="width:100%;border-collapse:collapse;margin-top:0;">
 
       ${sec("🏢 업체 정보")}
 
-      ${row("업체명",         s.companyName)}
+      ${row("업체명", s.companyName)}
 
-      ${row("대표자",         s.ceoName)}
+      ${row("대표자", s.ceoName)}
 
       ${row("사업자등록번호", s.businessRegNo)}
 
-      ${row("대표번호",       s.mainPhone)}
+      ${row("대표번호", s.mainPhone)}
 
-      ${row("설립연도",       s.establishYear)}
+      ${row("설립연도", s.establishYear)}
 
-      ${row("사업장 주소",    s.businessAddress)}
+      ${row("사업장 주소", s.businessAddress)}
 
-      ${row("사업분야",       s.businessField)}
+      ${row("사업분야", s.businessField)}
 
-      ${row("업종",           s.businessType)}
+      ${row("업종", s.businessType)}
 
-      ${row("주요 생산품",    s.mainProduct)}
+      ${row("주요 생산품", s.mainProduct)}
 
-      ${row("매출액",         s.salesAmount)}
-
- 
+      ${row("매출액", s.salesAmount)}
 
       ${sec("⚙️ 도급 작업 정보")}
 
       ${row("도급내용(계약서명)", s.contractTitle)}
 
-      ${row("공사시작 예정일",   dotDate(s.contractStart))}
+      ${row("공사시작 예정일", dotDate(s.contractStart))}
 
-      ${row("작업인원",          s.workerCount + "명")}
+      ${row("작업인원", s.workerCount + "명")}
 
-      ${row("취급물질",          s.handlingMaterials)}
+      ${row("취급물질", s.handlingMaterials)}
 
-      ${row("취급공정/시설",     s.handlingProcess)}
-
- 
+      ${row("취급공정/시설", s.handlingProcess)}
 
       ${sec("👤 제출자 정보")}
 
-      ${row("이름",     s.submitterName)}
+      ${row("이름", s.submitterName)}
 
       ${row("전화번호", s.submitterPhone)}
 
-      ${row("이메일",   s.submitterEmail)}
-
- 
+      ${row("이메일", s.submitterEmail)}
 
       ${sec("🦺 안전관리자")}
 
-      ${row("이름",     s.safetyManagerName)}
+      ${row("이름", s.safetyManagerName)}
 
-      ${row("직책",     s.safetyManagerPosition)}
+      ${row("직책", s.safetyManagerPosition)}
 
       ${row("전화번호", s.safetyManagerPhone)}
-
- 
 
       ${sec("📎 첨부파일 제출 현황")}
 
       ${fileStatusRows(fileMap, s.keyValue)}
 
     </table>
-
- 
 
     ${s.workSteps && s.workSteps.length > 0 ? `
 
@@ -851,8 +854,6 @@ function buildHtml1(s, fileMap) {
 
     </div>` : ""}
 
- 
-
     <div style="display:none;font-size:0;color:transparent;height:0;overflow:hidden;">
 
 [METADATA]
@@ -873,8 +874,6 @@ SUBMITTER_EMAIL: ${s.submitterEmail}
 
     </div>
 
- 
-
     <div style="margin-top:16px;padding:12px 16px;background:#f8fafc;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;">
 
       본 메일은 LG화학 여수공장 도급신고 자동접수 시스템에 의해 발송되었습니다.
@@ -887,7 +886,7 @@ SUBMITTER_EMAIL: ${s.submitterEmail}
 
  
 
-/* ===================== 2/2 메일 HTML 본문 ===================== */
+/* ===================== 2/2 메일 HTML ===================== */
 
 function buildHtml2(s) {
 
@@ -999,17 +998,13 @@ app.post("/submit", upload.any(), async (req, res) => {
 
   try {
 
-    /* 토큰 검증 */
-
     if (process.env.SUBMIT_TOKEN && req.body.token !== process.env.SUBMIT_TOKEN)
 
       return res.status(403).json({ ok: false, message: "제출 토큰이 올바르지 않습니다." });
 
  
 
-    /* 파일 유효성 */
-
-    const fileMap = filesByField(req.files);
+    const fileMap    = filesByField(req.files);
 
     const fileErrors = validateFiles(fileMap);
 
@@ -1019,23 +1014,15 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    /* 접수번호 생성 */
+    const receiptId  = (req.body.keyValue || req.body.serialNumber || `TEMP-${yyyymmdd()}`)
 
-    const receiptId = (req.body.keyValue || req.body.serialNumber || `TEMP-${yyyymmdd()}`)
-
-                    + `-${String(Date.now()).slice(-6)}`;
-
- 
-
-    /* submission 객체 */
+                     + `-${String(Date.now()).slice(-6)}`;
 
     const submission = buildSubmission(req.body, receiptId);
 
-    const kv = submission.keyValue;
+    const kv         = submission.keyValue;
 
  
-
-    /* 환경변수 체크 */
 
     if (!process.env.MAIL_TO || !process.env.MAIL_FROM)
 
@@ -1049,9 +1036,9 @@ app.post("/submit", upload.any(), async (req, res) => {
 
     const resend = new Resend(process.env.RESEND_API_KEY);
 
-    const to   = process.env.MAIL_TO;
+    const to     = process.env.MAIL_TO;
 
-    const from = process.env.MAIL_FROM;
+    const from   = process.env.MAIL_FROM;
 
  
 
@@ -1063,65 +1050,33 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    /* 첨부파일 분류 */
+    /* 첨부파일 */
 
-    const baseFileKeys = [
-
-      "contract", "pledge", "manpowerList",
-
-      "employmentCertificate", "ppeList", "ppeCertificate"
-
-    ];
+    const baseFileKeys = ["contract","pledge","manpowerList","employmentCertificate","ppeList","ppeCertificate"];
 
     const baseAttachments = [
 
-      ...baseFileKeys
+      ...baseFileKeys.filter(k => fileMap[k]).map(k => makeAttachment(fileMap[k], kv)),
 
-        .filter(k => fileMap[k])
+      { filename: `${kv}_수급인정보.pdf`,  content: pdf1Buffer.toString("base64"), contentType: "application/pdf" },
 
-        .map(k => makeAttachment(fileMap[k], kv)),
-
-      {
-
-        filename:    `${kv}_수급인정보.pdf`,
-
-        content:     pdf1Buffer.toString("base64"),
-
-        contentType: "application/pdf"
-
-      },
-
-      {
-
-        filename:    `${kv}_도급계획서.pdf`,
-
-        content:     pdf2Buffer.toString("base64"),
-
-        contentType: "application/pdf"
-
-      }
+      { filename: `${kv}_도급계획서.pdf`,  content: pdf2Buffer.toString("base64"), contentType: "application/pdf" }
 
     ];
 
  
 
-    /* 교육이수증 분리 */
-
     const trainingAttachments = fileMap.trainingCertificate
 
-      ? [makeAttachment(fileMap.trainingCertificate, kv)]
-
-      : [];
+      ? [makeAttachment(fileMap.trainingCertificate, kv)] : [];
 
  
 
-    /* 1/2 메일 발송 */
+    /* 메일 발송 */
 
     await resend.emails.send({
 
-      from,
-
-      to,
+      from, to,
 
       subject: `[${kv}] 도급신고 서류 제출 (1/2)`,
 
@@ -1133,15 +1088,11 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    /* 2/2 메일 발송 */
-
     if (trainingAttachments.length > 0) {
 
       await resend.emails.send({
 
-        from,
-
-        to,
+        from, to,
 
         subject: `[${kv}] 도급신고 서류 제출 (2/2)`,
 
@@ -1184,5 +1135,3 @@ app.use((err, req, res, next) => {
  
 
 app.listen(PORT, () => console.log(`Submit API listening on ${PORT}`));
-
- 
