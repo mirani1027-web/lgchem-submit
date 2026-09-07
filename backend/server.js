@@ -1019,8 +1019,8 @@ app.post("/submit", upload.any(), async (req, res) => {
                      + `-${String(Date.now()).slice(-6)}`;
 
     const submission = buildSubmission(req.body, receiptId);
-
-    const kv         = submission.keyValue;
+    const compName = submission.company || req.body.comp || "업체명";
+    const kv         = '${submission.keyValue}_${compName}';
 
  
 
