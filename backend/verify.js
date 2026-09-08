@@ -6,8 +6,6 @@ const apiKey = process.env.GEMINI_API_KEY;
 
  
 
-// 파일을 구글 API 규격에 맞는 Base64 객체로 변환
-
 function fileToGenerativePart(path, mimeType) {
 
   if (!fs.existsSync(path)) {
@@ -60,11 +58,9 @@ function extractCleanJson(rawText) {
 
 async function runDocVerification(files) {
 
-  console.log("=== AI 사전 검증 가동 (순수 REST API 모드) ===");
+  console.log("=== AI 사전 검증 가동 (AQ 키 헤더 보안 모드) ===");
 
  
-
-  // 1. API 키가 없는 경우 무중단 수동 검증 우회
 
   if (!apiKey) {
 
@@ -125,8 +121,6 @@ async function runDocVerification(files) {
   }
 
  
-
-  // API 전송 바디 생성 (구글 Gemini REST API 표준 규격)
 
   const parts = [
 
@@ -226,25 +220,29 @@ async function runDocVerification(files) {
 
  
 
-  // 텍스트 프롬프트 파트 추가
-
   parts.push({ text: prompt });
 
  
 
   try {
 
-    // 라이브러리 거치지 않고 구글 최신 API 엔드포인트로 직접 POST 요청
+    // [★개선 패치] URL에서 ?key= 부분을 완전히 지우고, 대신 headers에 x-goog-api-key로 안전하게 실어 보냅니다.
 
     const response = await fetch(
 
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent`,
 
       {
 
         method: "POST",
 
-        headers: { "Content-Type": "application/json" },
+        headers: {
+
+          "Content-Type": "application/json",
+
+          "x-goog-api-key": apiKey // 점(.)이 포함된 AQ 키를 구글이 깨짐 없이 온전히 읽을 수 있도록 조치
+
+        },
 
         body: JSON.stringify({ contents: [{ parts }] })
 
@@ -265,10 +263,6 @@ async function runDocVerification(files) {
  
 
     const resData = await response.json();
-
-   
-
-    // 응답 객체에서 텍스트 추출
 
     const responseText = resData.candidates[0].content.parts[0].text;
 
@@ -347,3 +341,5 @@ async function runDocVerification(files) {
  
 
 module.exports = { runDocVerification };
+
+ 
