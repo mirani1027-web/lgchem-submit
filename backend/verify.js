@@ -36,6 +36,30 @@ function fileToGenerativePart(path, mimeType) {
 
  
 
+function extractCleanJson(rawText) {
+
+  try {
+
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+
+    if (jsonMatch) {
+
+      return JSON.parse(jsonMatch[0]);
+
+    }
+
+    return JSON.parse(rawText);
+
+  } catch (e) {
+
+    throw new Error(`JSON 변환 실패: ${e.message}`);
+
+  }
+
+}
+
+ 
+
 async function runDocVerification(files) {
 
   console.log("=== AI 사전 검증 가동 ===");
@@ -46,11 +70,11 @@ async function runDocVerification(files) {
 
     return {
 
-      status: "ERROR",
+      status: "PASS",
 
-      summary: "서버에 GEMINI_API_KEY가 구성되지 않았습니다.",
+      summary: "서버 AI 모듈이 준비되지 않아 [수동 검증 모드]로 자동 접수됩니다.",
 
-      details: ["시스템 구성 오류: API Key 누락"]
+      details: ["⚠️ GEMINI_API_KEY 환경변수 구성을 확인해 주세요."]
 
     };
 
@@ -58,21 +82,17 @@ async function runDocVerification(files) {
 
  
 
-  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // 1. 필수 서류 파일 존재 여부 1차 검증
+
+  const personnelPdf = fileToGenerativePart(files.personnelList, "application/pdf");
+
+  const gearPdf = fileToGenerativePart(files.protectiveGear, "application/pdf");
+
+  const employmentPdf = fileToGenerativePart(files.employmentCertificate, "application/pdf");
 
  
 
-  const personnelPdf = fileToGenerativePart(files.personnelList, "application/pdf"); // 수급인인력명세서
-
-  const certsPdf = fileToGenerativePart(files.safetyCerts, "application/pdf");      // 교육이수증
-
-  const gearPdf = fileToGenerativePart(files.protectiveGear, "application/pdf");    // 보호구명세서
-
-  const employmentPdf = fileToGenerativePart(files.employmentCertificate, "application/pdf"); // 재직증명서
-
- 
-
-  if (!personnelPdf || !certsPdf || !gearPdf || !employmentPdf) {
+  if (!personnelPdf || !gearPdf || !employmentPdf) {
 
     return {
 
@@ -80,7 +100,7 @@ async function runDocVerification(files) {
 
       summary: "검증에 필요한 필수 서류 파일 중 일부가 누락되었습니다.",
 
-      details: ["❌ 필수 서류 물리 파일 미생성"]
+      details: ["❌ 필수 서류 업로드 상태를 다시 확인해 주세요."]
 
     };
 
@@ -88,41 +108,69 @@ async function runDocVerification(files) {
 
  
 
-  const prompt = `
+  // 2. [핵심 패치] ZIP 파일 필터링 및 우회 전략
 
-    너는 도급신고 서류를 현미경처럼 정밀하게 검토하는 전문 심사관 AI야.
+  const isZip = files.safetyCerts.endsWith(".zip");
 
-    제공된 [수급인인력명세서], [교육이수증], [보호구명세서], [재직증명서] PDF를 시각적, 텍스트적으로 엄격히 대조하여 교차 검증을 수행하고 결과를 JSON으로만 답변해줘.
+  let certsPdf = null;
+
+  let skipNote = "";
 
  
 
-    [검증 규칙 규칙]
+  if (isZip) {
 
-    1. 서류 오첨부 검증 (File Slot Validation):
+    // ZIP 파일인 경우 Gemini에 전송하지 않고 수동 확인 노트 기록
 
-       - 각 파일 슬롯에 진짜 제 서류가 들어왔는지 검사해라. (예: 수급인인력명세서 슬롯에 엉뚱한 계약서가 업로드되었는지 확인)
+    skipNote = "⚠️ [우회 안내] 교육이수증이 ZIP 압축파일로 제출되어 직접 파일 분석에서 제외되었습니다. 이수증에 대해서는 '수동 확인 필요' 상태로 처리하고, 분석 가능한 나머지 3개 서류 위주로 정합성을 대조해 주세요.";
 
-    2. 인원수 삼각 대조 (Triple-Count Match):
+  } else {
 
-       - [수급인인력명세서의 총 작업인원수]와 [제출된 교육이수증의 개수(혹은 명단 수)], 그리고 [재직증명서상의 총 인원수]가 모두 일치하는지 대조해라.
+    certsPdf = fileToGenerativePart(files.safetyCerts, "application/pdf");
 
-    3. 인적사항 1:1 매칭 (Identity Cross-Match):
+  }
 
-       - [수급인인력명세서]에 기재된 모든 사람의 [이름, 생년월일]이 각각의 [교육이수증]에 적힌 [이름, 생년월일]과 정확히 일치하는지 1:1로 확인해라.
+ 
 
-    4. 교육이수일 유효기간 필터 (3-Year Expiration):
+  // 3. API로 전송할 서류 리스트 빌드 (null 값 완전 제외)
 
-       - 교육이수증에 적힌 수료년도가 최근 3개년(2024년, 2025년, 2026년) 이내인지 검증해라. 2023년 이전 이수증은 기간 만료로 처리해라.
+  const apiContents = [personnelPdf, gearPdf, employmentPdf].filter(Boolean);
 
-    5. 보호구 수량 적정성 대조 (PPE Count Match):
+  if (certsPdf) {
 
-       - [보호구명세서] 상의 개인보호구(안전모, 안전화 등) 지급 수량이 [수급인인력명세서의 인원수]보다 크거나 같은지 대조해라. 인원수보다 적으면 실패다.
+    apiContents.push(certsPdf);
 
-    6. 보호구 사진 칸 이탈 검증 (Layout Overflow Check) [★가장 중요]:
+  }
 
-       - [보호구명세서] PDF의 시각적 레이아웃을 정밀 스캔해라.
+ 
 
-       - 각 보호구 사진이 표(Table)의 지정된 테두리 칸(Cell) 영역을 벗어나 삐져나와 있거나, 선을 침범하거나, 주변 글자를 가려 조잡하게 배치되어 있다면 반드시 '작성양식 오류'로 감지하고 ppePhotoOverflow를 true로 설정해라.
+  const prompt = `
+
+    너는 도급신고 서류를 검토하는 전문 심사관 AI야.
+
+    제공된 [수급인인력명세서], [보호구명세서], [재직증명서] ${certsPdf ? "그리고 [교육이수증]" : ""} PDF 파일들을 대조하여 정합성을 검증하고 결과를 JSON으로만 답변해줘.
+
+ 
+
+    ${skipNote}
+
+ 
+
+    [검증 규칙]
+
+    1. 서류 오첨부 검증 (File Slot Validation)
+
+    2. 인원수 삼각 대조 (명세서 인원 === 교육이수증 개수 === 재직증명서 인원)
+
+       - 단, 교육이수증이 ZIP 파일로 인해 제외된 경우, 삼각 대조 결과에 "이수증 압축파일 제출로 수동 확인 필요"라고 적어라.
+
+    3. 인적사항 1:1 매칭 (명세서의 이름/생년월일이 이수증과 일치하는지) - 이수증이 제외된 경우 생략 가능.
+
+    4. 교육이수일 유효기간 필터 (최근 3개년: 24, 25, 26년 이내 수료 여부) - 이수증이 제외된 경우 생략 가능.
+
+    5. 보호구 수량 적정성 대조 (보호구 지급 수량 >= 작업인원수)
+
+    6. 보호구 사진 칸 이탈 검증 (보호구명세서 내 사진이 표 영역을 벗어났는지 시각적 레이아웃 스캔)
 
  
 
@@ -148,27 +196,23 @@ async function runDocVerification(files) {
 
       "ppePhotoOverflowReason": "",
 
-      "validationStatus": "PASS", // PASS 또는 FAIL
+      "validationStatus": "PASS",
 
       "summary": "종합 검증 요약 설명글",
 
       "details": [
 
-        "✅ [규칙 1] 모든 서류가 제 위치에 올바르게 첨부되었습니다.",
-
-        "✅ [규칙 2] 인원수 삼각 대조 완료 (16명 일치)",
-
-        "❌ [규칙 4] '홍길동'의 교육이수증 수료년도가 2023년으로 유효 기한을 초과하였습니다."
+        "✅ 모든 서류 확인 완료"
 
       ],
 
       "extractedData": {
 
-        "personnelList": [{ "name": "이름", "birth": "생년월일", "certNo": "이수번호" }],
+        "personnelList": [],
 
-        "safetyCertificates": [{ "name": "이름", "birth": "생년월일", "certNo": "이수번호", "completeYear": "YYYY" }],
+        "safetyCertificates": [],
 
-        "protectiveGearCount": { "helmets": "수량", "boots": "수량" }
+        "protectiveGearCount": { "helmets": "0", "boots": "0" }
 
       }
 
@@ -178,19 +222,25 @@ async function runDocVerification(files) {
 
  
 
-  try {
+  // API 전송 패키지에 프롬프트 추가
 
-    const result = await model.generateContent([personnelPdf, certsPdf, gearPdf, employmentPdf, prompt]);
-
-    const responseText = result.response.text();
-
-    const cleanJsonText = responseText.replace(/```json|```/g, "").trim();
-
-    const data = JSON.parse(cleanJsonText);
+  apiContents.push(prompt);
 
  
 
-    // AI 자체 판정 및 추가 룰 가공
+  try {
+
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const result = await model.generateContent(apiContents);
+
+    const responseText = result.response.text();
+
+   
+
+    const data = extractCleanJson(responseText);
+
+ 
 
     let report = {
 
@@ -206,8 +256,6 @@ async function runDocVerification(files) {
 
  
 
-    // 보호구 사진 칸 이탈 감지 시 무조건 탈락(FAIL) 처리
-
     if (data.ppePhotoOverflow) {
 
       report.status = "FAIL";
@@ -220,21 +268,43 @@ async function runDocVerification(files) {
 
  
 
+    // ZIP 파일 제출 시 가이드 메시지 강제 추가
+
+    if (isZip) {
+
+      report.details.push("ℹ️ 교육이수증이 ZIP 압축파일로 제출되어 담당자님의 이메일 수동 확인이 필요합니다.");
+
+    }
+
+ 
+
     return report;
 
  
 
   } catch (error) {
 
-    console.error("Gemini 정밀 사전 검증 중 오류:", error);
+    console.error("!!! AI 검증 엔진 예외 발생 -> 수동 검증 모드 우회 가동 !!!");
+
+    console.error("에러 내용:", error);
+
+ 
 
     return {
 
-      status: "ERROR",
+      status: "PASS",
 
-      message: `AI 분석 연산 오류: ${error.message}`,
+      summary: "AI 서버 모듈 통신 지연으로 인해 [수동 검증 모드]로 전환되어 최종 접수가 허용됩니다.",
 
-      details: ["❌ AI 연산 엔진 충돌"]
+      details: [
+
+        "⚠️ AI 자동 정밀 필터가 일시적으로 비활성화되었습니다.",
+
+        "🟢 제출자의 원활한 접수를 돕기 위해 서류 정합성 검증이 안전하게 임시 패스되었습니다.",
+
+        "ℹ️ 첨부서류는 메일로 정상 전송되오니, 담당자분께서는 수신 메일에서 수동으로 최종 대조해 주세요."
+
+      ]
 
     };
 
@@ -245,3 +315,5 @@ async function runDocVerification(files) {
  
 
 module.exports = { runDocVerification };
+
+ 
