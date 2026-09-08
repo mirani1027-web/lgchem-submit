@@ -1,14 +1,12 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
 const fs = require("fs");
 
  
 
 const apiKey = process.env.GEMINI_API_KEY;
 
-const ai = apiKey ? new GoogleGenerativeAI(apiKey) : null;
-
  
+
+// 파일을 구글 API 규격에 맞는 Base64 객체로 변환
 
 function fileToGenerativePart(path, mimeType) {
 
@@ -62,17 +60,19 @@ function extractCleanJson(rawText) {
 
 async function runDocVerification(files) {
 
-  console.log("=== AI 사전 검증 가동 ===");
+  console.log("=== AI 사전 검증 가동 (순수 REST API 모드) ===");
 
  
 
-  if (!ai) {
+  // 1. API 키가 없는 경우 무중단 수동 검증 우회
+
+  if (!apiKey) {
 
     return {
 
       status: "PASS",
 
-      summary: "서버 AI 모듈이 준비되지 않아 [수동 검증 모드]로 자동 접수됩니다.",
+      summary: "서버 AI API 키가 설정되지 않아 [수동 검증 모드]로 자동 접수됩니다.",
 
       details: ["⚠️ GEMINI_API_KEY 환경변수 구성을 확인해 주세요."]
 
@@ -81,8 +81,6 @@ async function runDocVerification(files) {
   }
 
  
-
-  // 1. 필수 서류 파일 존재 여부 1차 검증
 
   const personnelPdf = fileToGenerativePart(files.personnelList, "application/pdf");
 
@@ -108,8 +106,6 @@ async function runDocVerification(files) {
 
  
 
-  // 2. [핵심 패치] ZIP 파일 필터링 및 우회 전략
-
   const isZip = files.safetyCerts.endsWith(".zip");
 
   let certsPdf = null;
@@ -119,8 +115,6 @@ async function runDocVerification(files) {
  
 
   if (isZip) {
-
-    // ZIP 파일인 경우 Gemini에 전송하지 않고 수동 확인 노트 기록
 
     skipNote = "⚠️ [우회 안내] 교육이수증이 ZIP 압축파일로 제출되어 직접 파일 분석에서 제외되었습니다. 이수증에 대해서는 '수동 확인 필요' 상태로 처리하고, 분석 가능한 나머지 3개 서류 위주로 정합성을 대조해 주세요.";
 
@@ -132,13 +126,23 @@ async function runDocVerification(files) {
 
  
 
-  // 3. API로 전송할 서류 리스트 빌드 (null 값 완전 제외)
+  // API 전송 바디 생성 (구글 Gemini REST API 표준 규격)
 
-  const apiContents = [personnelPdf, gearPdf, employmentPdf].filter(Boolean);
+  const parts = [
+
+    { inlineData: personnelPdf.inlineData },
+
+    { inlineData: gearPdf.inlineData },
+
+    { inlineData: employmentPdf.inlineData }
+
+  ];
+
+ 
 
   if (certsPdf) {
 
-    apiContents.push(certsPdf);
+    parts.push({ inlineData: certsPdf.inlineData });
 
   }
 
@@ -222,21 +226,51 @@ async function runDocVerification(files) {
 
  
 
-  // API 전송 패키지에 프롬프트 추가
+  // 텍스트 프롬프트 파트 추가
 
-  apiContents.push(prompt);
+  parts.push({ text: prompt });
 
  
 
   try {
 
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // 라이브러리 거치지 않고 구글 최신 API 엔드포인트로 직접 POST 요청
 
-    const result = await model.generateContent(apiContents);
+    const response = await fetch(
 
-    const responseText = result.response.text();
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+
+      {
+
+        method: "POST",
+
+        headers: { "Content-Type": "application/json" },
+
+        body: JSON.stringify({ contents: [{ parts }] })
+
+      }
+
+    );
+
+ 
+
+    if (!response.ok) {
+
+      const errText = await response.text();
+
+      throw new Error(`Google API HTTP Error: ${response.status} - ${errText}`);
+
+    }
+
+ 
+
+    const resData = await response.json();
 
    
+
+    // 응답 객체에서 텍스트 추출
+
+    const responseText = resData.candidates[0].content.parts[0].text;
 
     const data = extractCleanJson(responseText);
 
@@ -268,8 +302,6 @@ async function runDocVerification(files) {
 
  
 
-    // ZIP 파일 제출 시 가이드 메시지 강제 추가
-
     if (isZip) {
 
       report.details.push("ℹ️ 교육이수증이 ZIP 압축파일로 제출되어 담당자님의 이메일 수동 확인이 필요합니다.");
@@ -284,7 +316,7 @@ async function runDocVerification(files) {
 
   } catch (error) {
 
-    console.error("!!! AI 검증 엔진 예외 발생 -> 수동 검증 모드 우회 가동 !!!");
+    console.error("!!! AI REST API 통신 예외 발생 -> 수동 검증 모드 우회 가동 !!!");
 
     console.error("에러 내용:", error);
 
@@ -315,5 +347,3 @@ async function runDocVerification(files) {
  
 
 module.exports = { runDocVerification };
-
- 
