@@ -1,27 +1,73 @@
-on: [push, repository_dispatch]                           
+name: Document Verification Workflow
 
-  jobs:                                                     
+ 
 
-    verify-and-send:                                       
+# 트리거 조건: main 브랜치에 코드가 push되거나, 외부(웹폼)에서 API 요청(repository_dispatch)이 들어올 때 실행
 
-      runs-on: ubuntu-latest                                
+on:
 
-      steps:                                                 
+  push:
 
-        - uses: actions/checkout@v3                         
+    branches:
 
-        - uses: actions/setup-node@v3                       
+      - main
 
-          with: { node-version: '18' }                      
+  repository_dispatch:
 
-        - run: npm install                                  
+    types: [submit-form]
 
-        - name: Run Server & Verification                    
+ 
 
-          env:                                              
+jobs:
 
-            GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}   
+  verify-and-send:
 
-            RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}   
+    runs-on: ubuntu-latest
 
-          run: node server.js                 
+ 
+
+    steps:
+
+      # 1. 깃허브 저장소의 코드를 가상 서버로 내려받음
+
+      - name: Checkout repository code
+
+        uses: actions/checkout@v3
+
+ 
+
+      # 2. Node.js 18 버전 환경 설정 (npm 캐시 적용으로 속도 향상)
+
+      - name: Set up Node.js environment
+
+        uses: actions/setup-node@v3
+
+        with:
+
+          node-version: '18'
+
+          cache: 'npm'
+
+ 
+
+      # 3. package.json에 정의된 라이브러리들 설치
+
+      - name: Install dependencies
+
+        run: npm install
+
+ 
+
+      # 4. Gemini API Key와 Resend API Key를 안전하게 주입하여 메인 서버 스크립트 실행
+
+      - name: Run Server and Document Verification
+
+        env:
+
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+
+        run: node server.js
+
+ 
