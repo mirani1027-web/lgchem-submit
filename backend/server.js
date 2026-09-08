@@ -1,6 +1,6 @@
 const express = require("express");
 
-const fs = require("fs"); // 👈 임시 파일 생성을 위한 fs 모듈 추가
+const fs = require("fs"); // 임시 파일 생성을 위한 fs 모듈
 
 const { runDocVerification } = require('./verify.js');
 
@@ -216,6 +216,8 @@ function buildSubmission(body, receiptId) {
 
     contractStart: body.contractStart || "",
 
+    contractEnd: body.contractEnd || "", // 👈 계약만료일 매핑 추가 완료!
+
     workerCount: body.workerCount || "",
 
     handlingMaterials: body.handlingMaterials || "",
@@ -280,9 +282,21 @@ function newDoc() {
 
   const doc = new PDFDocument({ size: "A4", margin: 50 });
 
-  doc.registerFont("Korean", path.join(__dirname, "fonts", "malgun.ttf"));
+  const fontPath = path.join(__dirname, "fonts", "malgun.ttf");
 
-  doc.font("Korean");
+  if (fs.existsSync(fontPath)) {
+
+    doc.registerFont("Korean", fontPath);
+
+    doc.font("Korean");
+
+  } else {
+
+    console.warn("⚠️ fonts/malgun.ttf가 없어 Helvetica 폰트로 대체합니다.");
+
+    doc.font("Helvetica");
+
+  }
 
   return doc;
 
@@ -670,39 +684,7 @@ async function createPdf2(s) {
 
  
 
-/* ===================== 첨부파일 제출 현황 행 ===================== */
-
-function fileStatusRows(fileMap, keyValue) {
-
-  return Object.entries(FIELD_RULES).map(([key, rule]) => {
-
-    const file = fileMap[key];
-
-    const icon = file ? "✅" : (rule.required ? "❌" : "➖");
-
-    const name = file
-
-      ? `${keyValue}_${rule.label}.${getExt(file.originalname)}`
-
-      : (rule.required ? "미제출" : "해당없음");
-
-    return `
-
-      <tr>
-
-        <td style="padding:7px 12px;border:1px solid #e2e8f0;font-size:13px;color:#334155;">${icon} ${rule.label}</td>
-
-        <td style="padding:7px 12px;border:1px solid #e2e8f0;font-size:12px;color:#64748b;">${name}</td>
-
-      </tr>`;
-
-  }).join("");
-
-}
-
- 
-
-/* ===================== 1/2 메일 HTML ===================== */
+/* ===================== 1/2 메일 HTML (슬림 에센셜 버전) ===================== */
 
 function buildHtml1(s, fileMap) {
 
@@ -710,9 +692,9 @@ function buildHtml1(s, fileMap) {
 
     <tr>
 
-      <td style="padding:7px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:12px;font-weight:700;color:#475569;white-space:nowrap;width:140px;">${label}</td>
+      <td style="padding:6px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:12px;font-weight:700;color:#475569;white-space:nowrap;width:140px;">${label}</td>
 
-      <td style="padding:7px 12px;border:1px solid #e2e8f0;font-size:13px;color:#0f172a;">${value || "-"}</td>
+      <td style="padding:6px 12px;border:1px solid #e2e8f0;font-size:12px;color:#0f172a;">${value || "-"}</td>
 
     </tr>`;
 
@@ -720,21 +702,23 @@ function buildHtml1(s, fileMap) {
 
     <tr>
 
-      <td colspan="2" style="padding:8px 12px;background:#1e3a8a;color:#fff;font-size:12px;font-weight:900;border:1px solid #1e3a8a;">${title}</td>
+      <td colspan="2" style="padding:7px 12px;background:#1e3a8a;color:#fff;font-size:12px;font-weight:900;border:1px solid #1e3a8a;">${title}</td>
 
     </tr>`;
 
+ 
+
   return `
 
-  <div style="font-family:'Malgun Gothic',Arial,sans-serif;max-width:680px;margin:0 auto;background:#fff;">
+  <div style="font-family:'Malgun Gothic',Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
 
-    <div style="background:#0f172a;border-radius:12px 12px 0 0;padding:18px 22px;">
+    <div style="background:#0f172a;padding:16px 20px;">
 
-      <div style="font-size:11px;color:#93c5fd;font-weight:700;margin-bottom:4px;">도급신고 서류 접수 (1/2 기본서류)</div>
+      <div style="font-size:10px;color:#93c5fd;font-weight:700;margin-bottom:2px;">도급신고 서류 접수 (1/2 기본서류)</div>
 
-      <div style="font-size:20px;font-weight:900;color:#fff;">[${s.keyValue}] ${s.companyName}</div>
+      <div style="font-size:18px;font-weight:900;color:#fff;">[${s.keyValue}] ${s.companyName}</div>
 
-      <div style="font-size:12px;color:#94a3b8;margin-top:4px;">접수일시: ${s.submitDateTime}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px;">접수일시: ${s.submitDateTime}</div>
 
     </div>
 
@@ -750,17 +734,7 @@ function buildHtml1(s, fileMap) {
 
       ${row("대표번호", s.mainPhone)}
 
-      ${row("설립연도", s.establishYear)}
-
-      ${row("사업장 주소", s.businessAddress)}
-
-      ${row("사업분야", s.businessField)}
-
-      ${row("업종", s.businessType)}
-
-      ${row("주요 생산품", s.mainProduct)}
-
-      ${row("매출액", s.salesAmount)}
+     
 
       ${sec("⚙️ 도급 작업 정보")}
 
@@ -768,11 +742,11 @@ function buildHtml1(s, fileMap) {
 
       ${row("공사시작 예정일", dotDate(s.contractStart))}
 
+      ${row("계약만료일", dotDate(s.contractEnd))}
+
       ${row("작업인원", s.workerCount + "명")}
 
-      ${row("취급물질", s.handlingMaterials)}
-
-      ${row("취급공정/시설", s.handlingProcess)}
+ 
 
       ${sec("👤 제출자 정보")}
 
@@ -782,6 +756,8 @@ function buildHtml1(s, fileMap) {
 
       ${row("이메일", s.submitterEmail)}
 
+ 
+
       ${sec("🦺 안전관리자")}
 
       ${row("이름", s.safetyManagerName)}
@@ -790,45 +766,11 @@ function buildHtml1(s, fileMap) {
 
       ${row("전화번호", s.safetyManagerPhone)}
 
-      ${sec("📎 첨부파일 제출 현황")}
-
-      ${fileStatusRows(fileMap, s.keyValue)}
-
     </table>
 
-    ${s.workSteps && s.workSteps.length > 0 ? `
+   
 
-    <div style="margin-top:16px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
-
-      <div style="background:#0f172a;padding:8px 14px;font-size:12px;font-weight:900;color:#fff;">📋 작업절차</div>
-
-      <table style="width:100%;border-collapse:collapse;">
-
-        <tr>
-
-          <th style="padding:7px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:11px;color:#475569;width:70px;">단계</th>
-
-          <th style="padding:7px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:11px;color:#475569;width:160px;">작업명</th>
-
-          <th style="padding:7px 12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:11px;color:#475569;">세부내용</th>
-
-        </tr>
-
-        ${s.workSteps.map(step => `
-
-        <tr>
-
-          <td style="padding:7px 12px;border:1px solid #e2e8f0;font-size:12px;color:#1d4ed8;font-weight:700;text-align:center;">${step.step}단계</td>
-
-          <td style="padding:7px 12px;border:1px solid #e2e8f0;font-size:12px;color:#334155;font-weight:700;">${step.title || ""}</td>
-
-          <td style="padding:7px 12px;border:1px solid #e2e8f0;font-size:12px;color:#475569;white-space:pre-line;">${step.detail || ""}</td>
-
-        </tr>`).join("")}
-
-      </table>
-
-    </div>` : ""}
+    <!-- 🔒 파싱용 숨김 메타데이터 (공백 없는 키워드 설계) -->
 
     <div style="display:none;font-size:0;color:transparent;height:0;overflow:hidden;">
 
@@ -842,7 +784,15 @@ CONTRACT_NAME: ${s.contractTitle}
 
 START_DATE: ${s.contractStart}
 
+END_DATE: ${s.contractEnd}
+
 WORKER_COUNT: ${s.workerCount}
+
+SAFETY_NAME: ${s.safetyManagerName}
+
+SAFETY_POSITION: ${s.safetyManagerPosition}
+
+SAFETY_PHONE: ${s.safetyManagerPhone}
 
 SUBMITTER_EMAIL: ${s.submitterEmail}
 
@@ -850,7 +800,9 @@ SUBMITTER_EMAIL: ${s.submitterEmail}
 
     </div>
 
-    <div style="margin-top:16px;padding:12px 16px;background:#f8fafc;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;">
+   
+
+    <div style="padding:12px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;">
 
       본 메일은 LG화학 여수공장 도급신고 자동접수 시스템에 의해 발송되었습니다.
 
@@ -865,8 +817,6 @@ SUBMITTER_EMAIL: ${s.submitterEmail}
 /* ===================== 2/2 메일 HTML ===================== */
 
 function buildHtml2(s, verificationReport) {
-
-  // === [핵심 기능] AI 검증 결과를 HTML에 바인딩 ===
 
   let reportHtml = `
 
@@ -1000,7 +950,7 @@ function buildHtml2(s, verificationReport) {
 
  
 
-    ${reportHtml} <!-- 👈 여기에 AI 가채점 리포트 연동 -->
+    ${reportHtml}
 
  
 
@@ -1060,8 +1010,6 @@ app.get("/test-mail", async (req, res) => {
 
 app.post("/submit", upload.any(), async (req, res) => {
 
-  // 가상 환경의 임시 파일 보관을 위한 경로 배열 정의
-
   const tempFilesToClean = [];
 
  
@@ -1092,9 +1040,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
     const compName = safeName(submission.companyName || req.body.comp || "업체명");
 
-   
-
-    // ⚠️ 버그 수정: 싱글 쿼테이션(')을 백틱(`) 템플릿 리터럴로 수정하여 변수 바인딩 정상화
+  
 
     const kv = `${submission.keyValue}_${compName}`;
 
@@ -1126,7 +1072,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    /* ===================== [핵심 가교 로직] Buffer ➡️ 임시 파일 디스크 생성 ===================== */
+    /* ===================== [가교 로직] Buffer ➡️ 임시 파일 생성 ===================== */
 
     const tempDir = path.join(__dirname, "temp");
 
@@ -1149,8 +1095,6 @@ app.post("/submit", upload.any(), async (req, res) => {
     };
 
  
-
-    // 메모리 내 버퍼 데이터를 물리 디스크 파일로 저장 (Gemini가 직접 읽을 수 있게 함)
 
     if (fileMap["manpowerList"]) {
 
@@ -1184,7 +1128,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
     let verificationReport = { status: "ERROR", message: "자동 검증을 수행하지 못했습니다.", details: [] };
 
-   
+  
 
     try {
 
@@ -1250,7 +1194,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
         subject: `[${kv}] 도급신고 서류 제출 (2/2) - [AI검증: ${verificationReport.status}]`,
 
-        html: buildHtml2(submission, verificationReport), // 👈 검증 리포트 객체 주입
+        html: buildHtml2(submission, verificationReport),
 
         attachments: trainingAttachments
 
@@ -1260,7 +1204,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    // 작업 종료 후 즉시 임시 파일 청소 (메모리 및 디스크 누수 방지)
+    // 파일 청소
 
     tempFilesToClean.forEach(fPath => {
 
@@ -1282,9 +1226,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
     console.error(err);
 
-   
-
-    // 에러 발생 시에도 생성되어 있던 임시 파일은 반드시 소거
+  
 
     tempFilesToClean.forEach(fPath => {
 
@@ -1321,3 +1263,4 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => console.log(`Submit API listening on ${PORT}`));
 
  
+
