@@ -1,12 +1,14 @@
-const { GoogleGenAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI } = require("@google/generative-ai"); // 👈 1. 올바른 클래스명으로 수정
 
 const fs = require("fs");
 
  
 
-// 1. Gemini API 초기화
+// 2. 생성자 호출 방식 수정: 객체 { apiKey: ... } 가 아닌 API Key 문자열을 직접 전달합니다.
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const apiKey = process.env.GEMINI_API_KEY;
+
+const ai = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
  
 
@@ -16,7 +18,7 @@ function fileToGenerativePart(path, mimeType) {
 
   if (!fs.existsSync(path)) {
 
-    console.log(`파일 없음: ${path}`);
+    console.log(`[AI 검증] 물리 파일 없음: ${path}`);
 
     return null;
 
@@ -44,77 +46,105 @@ async function runDocVerification(files) {
 
  
 
-  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // API Key 누락 시 안전장치
 
- 
+  if (!ai) {
 
-  // 분석할 PDF 파일들을 변환 (경로는 기존 저장 환경에 맞게 수정 필요)
+    console.error("❌ 에러: GEMINI_API_KEY 환경변수가 존재하지 않습니다.");
 
-  const personnelPdf = fileToGenerativePart(files.personnelList, "application/pdf"); // 수급인인력명세서
+    return {
 
-  const certsPdf = fileToGenerativePart(files.safetyCerts, "application/pdf");      // 교육이수증(통합본 또는 개별)
+      status: "ERROR",
 
-  const gearPdf = fileToGenerativePart(files.protectiveGear, "application/pdf");    // 보호구명세서
+      message: "서버에 AI API Key가 설정되지 않아 자동 검증을 진행할 수 없습니다."
 
- 
-
-  if (!personnelPdf || !certsPdf) {
-
-    return { status: "ERROR", message: "필수 검증 서류(인력명세서 또는 교육이수증)가 누락되었습니다." };
+    };
 
   }
 
  
 
-  // Gemini에게 보낼 프롬프트 (5대 룰 데이터를 뽑아오기 위함)
+  try {
 
-  const prompt = `
-
-    너는 도급신고 서류를 검증하는 전문 AI야.
-
-    제공된 [수급인인력명세서], [교육이수증], [보호구명세서] PDF 파일들을 분석해서 교차 검증에 필요한 아래 데이터들을 정확히 추출해줘.
-
-   
-
-    반드시 아래 JSON 형식으로만 답변해야 해. 다른 설명이나 텍스트(예: \`\`\`json)는 일절 포함하지 마.
-
-   
-
-    {
-
-      "personnelList": [
-
-        { "name": "이름", "birth": "생년월일(YYMMDD)", "certNo": "이수번호" }
-
-      ],
-
-      "safetyCertificates": [
-
-        { "name": "이름", "birth": "생년월일(YYMMDD)", "certNo": "이수번호", "completeYear": "교육이수연도(YYYY)" }
-
-      ],
-
-      "protectiveGearCount": {
-
-        "helmets": "안전모수량(숫자만)",
-
-        "boots": "안전화수량(숫자만)"
-
-      }
-
-    }
-
-  `;
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
  
 
-  try {
+    // 분석할 PDF 파일들을 안전하게 변환
+
+    const personnelPdf = fileToGenerativePart(files.personnelList, "application/pdf"); // 수급인인력명세서
+
+    const certsPdf = fileToGenerativePart(files.safetyCerts, "application/pdf");      // 교육이수증
+
+    const gearPdf = fileToGenerativePart(files.protectiveGear, "application/pdf");    // 보호구명세서
+
+ 
+
+    // 필수 서류가 누락된 경우 즉시 예외 처리하여 서버 다운(254) 방지
+
+    if (!personnelPdf || !certsPdf) {
+
+      return {
+
+        status: "ERROR",
+
+        message: "필수 서류(인력명세서 또는 교육이수증) 파일이 생성되지 않았습니다."
+
+      };
+
+    }
+
+ 
+
+    // Gemini 교차 검증용 프롬프트
+
+    const prompt = `
+
+      너는 도급신고 서류를 검증하는 전문 AI야.
+
+      제공된 [수급인인력명세서], [교육이수증], [보호구명세서] PDF 파일들을 분석해서 교차 검증에 필요한 아래 데이터들을 정확히 추출해줘.
+
+    
+
+      반드시 아래 JSON 형식으로만 답변해야 해. 다른 설명이나 텍스트(예: \`\`\`json)는 일절 포함하지 마.
+
+    
+
+      {
+
+        "personnelList": [
+
+          { "name": "이름", "birth": "생년월일(YYMMDD)", "certNo": "이수번호" }
+
+        ],
+
+        "safetyCertificates": [
+
+          { "name": "이름", "birth": "생년월일(YYMMDD)", "certNo": "이수번호", "completeYear": "교육이수연도(YYYY)" }
+
+        ],
+
+        "protectiveGearCount": {
+
+          "helmets": "안전모수량(숫자만)",
+
+          "boots": "안전화수량(숫자만)"
+
+        }
+
+      }
+
+    `;
+
+ 
+
+    // API 호출 전송
 
     const result = await model.generateContent([prompt, personnelPdf, certsPdf, gearPdf].filter(Boolean));
 
     const responseText = result.response.text();
 
-   
+    
 
     // JSON 데이터 정제 및 파싱
 
@@ -124,19 +154,23 @@ async function runDocVerification(files) {
 
  
 
-    // 5대 룰 엔진 실행
+    // 5대 룰 엔진 실행 후 리포트 반환
 
-    const report = executeValidationRules(data);
-
-    return report;
+    return executeValidationRules(data);
 
  
 
   } catch (error) {
 
-    console.error("Gemini 검증 중 에러 발생:", error);
+    console.error("Gemini 검증 중 치명적 에러 발생:", error);
 
-    return { status: "ERROR", message: "AI 검증 중 시스템 에러가 발생했습니다." };
+    return {
+
+      status: "ERROR",
+
+      message: `AI 분석 연산 오류: ${error.message}`
+
+    };
 
   }
 
@@ -166,9 +200,7 @@ function executeValidationRules(data) {
 
   const gear = data.protectiveGearCount || { helmets: 0, boots: 0 };
 
- 
-
-  const currentYear = new Date().getFullYear(); // 올해 기준 (예: 2024)
+  const currentYear = new Date().getFullYear();
 
  
 
@@ -222,7 +254,7 @@ function executeValidationRules(data) {
 
     const year = parseInt(c.completeYear);
 
-    if (year < currentYear - 2 || year > currentYear) {
+    if (isNaN(year) || year < currentYear - 2 || year > currentYear) {
 
       report.status = "FAIL";
 
@@ -271,5 +303,3 @@ function executeValidationRules(data) {
  
 
 module.exports = { runDocVerification };
-
- 
