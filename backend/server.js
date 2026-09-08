@@ -1,5 +1,7 @@
 const express = require("express");
 
+const fs = require("fs"); // 👈 임시 파일 생성을 위한 fs 모듈 추가
+
 const { runDocVerification } = require('./verify.js');
 
 const cors = require("cors");
@@ -52,23 +54,23 @@ app.use(cors({
 
 const FIELD_RULES = {
 
-  businessLicense:       { label: "사업자등록증",        required: true,  maxMB: 1,  ext: ["jpg","jpeg","png"] },
+  businessLicense: { label: "사업자등록증", required: true, maxMB: 1, ext: ["jpg","jpeg","png"] },
 
-  vatCertificate:        { label: "부가가치세표준증명원", required: true,  maxMB: 1,  ext: ["jpg","jpeg","png"] },
+  vatCertificate: { label: "부가가치세표준증명원", required: true, maxMB: 1, ext: ["jpg","jpeg","png"] },
 
-  contract:              { label: "계약서",               required: true,  maxMB: 5,  ext: ["pdf"] },
+  contract: { label: "계약서", required: true, maxMB: 5, ext: ["pdf"] },
 
-  pledge:                { label: "확약서",               required: false, maxMB: 1,  ext: ["pdf"] },
+  pledge: { label: "확약서", required: false, maxMB: 1, ext: ["pdf"] },
 
-  manpowerList:          { label: "수급인인력명세서",     required: true,  maxMB: 1,  ext: ["pdf"] },
+  manpowerList: { label: "수급인인력명세서", required: true, maxMB: 1, ext: ["pdf"] },
 
-  trainingCertificate:   { label: "교육이수증",           required: true,  maxMB: 20, ext: ["pdf","zip"] },
+  trainingCertificate: { label: "교육이수증", required: true, maxMB: 20, ext: ["pdf","zip"] },
 
-  employmentCertificate: { label: "재직증명서",           required: true,  maxMB: 1,  ext: ["pdf"] },
+  employmentCertificate: { label: "재직증명서", required: true, maxMB: 1, ext: ["pdf"] },
 
-  ppeList:               { label: "보호구명세서",         required: true,  maxMB: 1,  ext: ["pdf"] },
+  ppeList: { label: "보호구명세서", required: true, maxMB: 1, ext: ["pdf"] },
 
-  ppeCertificate:        { label: "보호구인증서",         required: true,  maxMB: 5,  ext: ["pdf","zip"] }
+  ppeCertificate: { label: "보호구인증서", required: true, maxMB: 5, ext: ["pdf","zip"] }
 
 };
 
@@ -190,47 +192,47 @@ function buildSubmission(body, receiptId) {
 
     submitDateTime: new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
 
-    companyName:     body.companyName     || "",
+    companyName: body.companyName || "",
 
-    ceoName:         body.ceoName         || "",
+    ceoName: body.ceoName || "",
 
-    mainPhone:       body.mainPhoneFormatted       || body.mainPhone       || "",
+    mainPhone: body.mainPhoneFormatted || body.mainPhone || "",
 
-    businessRegNo:   body.businessRegNoFormatted   || body.businessRegNo   || "",
+    businessRegNo: body.businessRegNoFormatted || body.businessRegNo || "",
 
-    businessType:    body.businessType    || "",
+    businessType: body.businessType || "",
 
-    mainProduct:     body.mainProduct     || "",
+    mainProduct: body.mainProduct || "",
 
-    salesAmount:     body.salesAmountFormatted ? body.salesAmountFormatted : formatCurrency(body.salesAmount),
+    salesAmount: body.salesAmountFormatted ? body.salesAmountFormatted : formatCurrency(body.salesAmount),
 
-    establishYear:   body.establishYear   || "",
+    establishYear: body.establishYear || "",
 
     businessAddress: body.businessAddress || "",
 
-    businessField:   body.businessField   || "",
+    businessField: body.businessField || "",
 
-    contractTitle:   body.contractTitle   || "",
+    contractTitle: body.contractTitle || "",
 
-    contractStart:   body.contractStart   || "",
+    contractStart: body.contractStart || "",
 
-    workerCount:     body.workerCount     || "",
+    workerCount: body.workerCount || "",
 
     handlingMaterials: body.handlingMaterials || "",
 
-    handlingProcess:   body.handlingProcess   || "",
+    handlingProcess: body.handlingProcess || "",
 
-    submitterName:   body.submitterName   || "",
+    submitterName: body.submitterName || "",
 
-    submitterPhone:  body.submitterPhoneFormatted || body.submitterPhone || "",
+    submitterPhone: body.submitterPhoneFormatted || body.submitterPhone || "",
 
-    submitterEmail:  body.submitterEmail  || "",
+    submitterEmail: body.submitterEmail || "",
 
-    safetyManagerName:     body.safetyManagerName     || "",
+    safetyManagerName: body.safetyManagerName || "",
 
     safetyManagerPosition: body.safetyManagerPosition || "",
 
-    safetyManagerPhone:    body.safetyManagerPhoneFormatted || body.safetyManagerPhone || "",
+    safetyManagerPhone: body.safetyManagerPhoneFormatted || body.safetyManagerPhone || "",
 
     workSteps
 
@@ -254,15 +256,15 @@ const FILE_LABEL_MAP = {
 
 function makeAttachment(file, keyValue) {
 
-  const ext   = getExt(file.originalname);
+  const ext = getExt(file.originalname);
 
   const label = FILE_LABEL_MAP[file.fieldname] || file.fieldname;
 
   return {
 
-    filename:    `${keyValue}_${label}.${ext}`,
+    filename: `${keyValue}_${label}.${ext}`,
 
-    content:     file.buffer.toString("base64"),
+    content: file.buffer.toString("base64"),
 
     contentType: file.mimetype
 
@@ -300,13 +302,13 @@ async function createPdf1(s, fileMap) {
 
     doc.on("data", c => chunks.push(c));
 
-    doc.on("end",  () => resolve(Buffer.concat(chunks)));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
 
     doc.on("error", reject);
 
  
 
-    const L     = 50;
+    const L = 50;
 
     const pageW = 495;
 
@@ -338,11 +340,9 @@ async function createPdf1(s, fileMap) {
 
  
 
-    /* 상단 굵은 선 */
-
     doc.moveTo(L, 60).lineTo(L + pageW, 60).lineWidth(1.25).strokeColor("#000").stroke();
 
-    doc.fontSize(13).fillColor("#0f172a").text("3.  수급인", L, 68);
+    doc.fontSize(13).fillColor("#0f172a").text("3. 수급인", L, 68);
 
  
 
@@ -356,13 +356,11 @@ async function createPdf1(s, fileMap) {
 
  
 
-    /* 행1: 업체명 | 값 | 대표자명 | 값 */
+    cell(L, y, c1, ROW_H, "업체명");
 
-    cell(L,          y, c1, ROW_H, "업체명");
+    cell(L+c1, y, c2, ROW_H, s.companyName);
 
-    cell(L+c1,       y, c2, ROW_H, s.companyName);
-
-    cell(L+c1+c2,    y, c3, ROW_H, "대표자명");
+    cell(L+c1+c2, y, c3, ROW_H, "대표자명");
 
     cell(L+c1+c2+c3, y, c4, ROW_H, s.ceoName);
 
@@ -370,13 +368,11 @@ async function createPdf1(s, fileMap) {
 
  
 
-    /* 행2: 설립연도 | 값 | 업종 | 값 */
+    cell(L, y, c1, ROW_H, "설립연도");
 
-    cell(L,          y, c1, ROW_H, "설립연도");
+    cell(L+c1, y, c2, ROW_H, s.establishYear);
 
-    cell(L+c1,       y, c2, ROW_H, s.establishYear);
-
-    cell(L+c1+c2,    y, c3, ROW_H, "업종");
+    cell(L+c1+c2, y, c3, ROW_H, "업종");
 
     cell(L+c1+c2+c3, y, c4, ROW_H, s.businessType);
 
@@ -384,9 +380,7 @@ async function createPdf1(s, fileMap) {
 
  
 
-    /* 행3: 사업장 주소 */
-
-    cell(L,    y, c1,         ROW_H, "사업장 주소");
+    cell(L, y, c1, ROW_H, "사업장 주소");
 
     cell(L+c1, y, pageW - c1, ROW_H, s.businessAddress);
 
@@ -394,23 +388,21 @@ async function createPdf1(s, fileMap) {
 
  
 
-    /* 행4: 안전관리 담당자 */
-
     const sL1=90, sL2=50, sV1=70, sL3=50, sV2=70, sL4=50,
 
           sV3=pageW-sL1-sL2-sV1-sL3-sV2-sL4;
 
-    cell(L,                          y, sL1, ROW_H, "안전관리 담당자", 9);
+    cell(L, y, sL1, ROW_H, "안전관리 담당자", 9);
 
-    cell(L+sL1,                      y, sL2, ROW_H, "성명",           9);
+    cell(L+sL1, y, sL2, ROW_H, "성명", 9);
 
-    cell(L+sL1+sL2,                  y, sV1, ROW_H, s.safetyManagerName, 9);
+    cell(L+sL1+sL2, y, sV1, ROW_H, s.safetyManagerName, 9);
 
-    cell(L+sL1+sL2+sV1,              y, sL3, ROW_H, "직급",           9);
+    cell(L+sL1+sL2+sV1, y, sL3, ROW_H, "직급", 9);
 
-    cell(L+sL1+sL2+sV1+sL3,         y, sV2, ROW_H, s.safetyManagerPosition, 9);
+    cell(L+sL1+sL2+sV1+sL3, y, sV2, ROW_H, s.safetyManagerPosition, 9);
 
-    cell(L+sL1+sL2+sV1+sL3+sV2,     y, sL4, ROW_H, "연락처",         9);
+    cell(L+sL1+sL2+sV1+sL3+sV2, y, sL4, ROW_H, "연락처", 9);
 
     cell(L+sL1+sL2+sV1+sL3+sV2+sL4, y, sV3, ROW_H, s.safetyManagerPhone, 9);
 
@@ -418,23 +410,21 @@ async function createPdf1(s, fileMap) {
 
  
 
-    /* 행5~8: 라벨 | 값 */
-
     const lW = c1, vW = pageW - lW;
 
     for (const [label, value] of [
 
-      ["임직원수",   s.workerCount + "명"],
+      ["임직원수", s.workerCount + "명"],
 
-      ["사업분야",   s.businessField],
+      ["사업분야", s.businessField],
 
-      ["매출액",     s.salesAmount],
+      ["매출액", s.salesAmount],
 
       ["주요생산품", s.mainProduct],
 
     ]) {
 
-      cell(L,      y, lW, ROW_H, label);
+      cell(L, y, lW, ROW_H, label);
 
       cell(L + lW, y, vW, ROW_H, value);
 
@@ -444,27 +434,23 @@ async function createPdf1(s, fileMap) {
 
  
 
-    /* 주요생산품 아래 굵은 선 */
-
     doc.moveTo(L, y).lineTo(L + pageW, y).lineWidth(1.25).stroke();
 
     y += 16;
 
  
 
-    /* 이미지 제목 행 */
-
     const halfW = pageW / 2;
 
     doc.lineWidth(0.75);
 
-    doc.rect(L,         y, halfW, 24).stroke();
+    doc.rect(L, y, halfW, 24).stroke();
 
     doc.rect(L + halfW, y, halfW, 24).stroke();
 
     doc.fontSize(10).fillColor("#0f172a")
 
-       .text("사업자등록증",          L,         y + 7, { width: halfW, align: "center" })
+       .text("사업자등록증", L, y + 7, { width: halfW, align: "center" })
 
        .text("부가가치세과세표준증명", L + halfW, y + 7, { width: halfW, align: "center" });
 
@@ -472,11 +458,9 @@ async function createPdf1(s, fileMap) {
 
  
 
-    /* 이미지 영역 */
-
     const imgAreaH = doc.page.height - y - 50;
 
-    doc.rect(L,         y, halfW, imgAreaH).stroke();
+    doc.rect(L, y, halfW, imgAreaH).stroke();
 
     doc.rect(L + halfW, y, halfW, imgAreaH).stroke();
 
@@ -528,25 +512,25 @@ async function createPdf2(s) {
 
     doc.on("data", c => chunks.push(c));
 
-    doc.on("end",  () => resolve(Buffer.concat(chunks)));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
 
     doc.on("error", reject);
 
  
 
-    const L    = 50;
+    const L = 50;
 
     const pageW = 495;
 
-    const col1  = 160;
+    const col1 = 160;
 
-    const col2  = pageW - col1;
+    const col2 = pageW - col1;
 
  
 
     doc.fontSize(13).fillColor("#0f172a")
 
-       .text("[붙임3]  도급계획서", L, 60);
+       .text("[붙임3] 도급계획서", L, 60);
 
  
 
@@ -554,13 +538,9 @@ async function createPdf2(s) {
 
  
 
-    /* 상단 굵은 선 */
-
     doc.moveTo(L, y).lineTo(L + pageW, y).lineWidth(1.25).strokeColor("#000").stroke();
 
  
-
-    /* 헤더 행 */
 
     const headerH = 32;
 
@@ -572,7 +552,7 @@ async function createPdf2(s) {
 
     doc.fontSize(11).fillColor("#0f172a")
 
-       .text("구  분",   L,      y + 10, { width: col1, align: "center" })
+       .text("구 분", L, y + 10, { width: col1, align: "center" })
 
        .text("세부내용", L+col1, y + 10, { width: col2, align: "center" });
 
@@ -580,11 +560,9 @@ async function createPdf2(s) {
 
  
 
-    /* 작업절차 텍스트 */
-
     const processText = (s.workSteps || [])
 
-      .map(st => `${st.step}.  ${st.title}\n    ${st.detail}`)
+      .map(st => `${st.step}. ${st.title}\n ${st.detail}`)
 
       .join("\n");
 
@@ -592,13 +570,13 @@ async function createPdf2(s) {
 
     const procBaseH = doc.heightOfString(processText, { width: col2 - 24 });
 
-    const procRowH  = Math.round(Math.max(120, procBaseH + 24) * 1.3);
+    const procRowH = Math.round(Math.max(120, procBaseH + 24) * 1.3);
 
  
 
     function autoRow(label, value, minH, centerValue) {
 
-      const th   = doc.heightOfString(String(value || "-"), { width: col2 - 20 });
+      const th = doc.heightOfString(String(value || "-"), { width: col2 - 20 });
 
       const rowH = Math.max(minH, th + 24);
 
@@ -652,15 +630,15 @@ async function createPdf2(s) {
 
  
 
-    autoRow("수급업체명",                  s.companyName,    40,       true);
+    autoRow("수급업체명", s.companyName, 40, true);
 
-    autoRow("도급대상 단위공장명 및 장소", s.handlingProcess, 50,       true);
+    autoRow("도급대상 단위공장명 및 장소", s.handlingProcess, 50, true);
 
-    autoRow("도급대상 시설·설비·장치 종류", s.handlingProcess, 50,      true);
+    autoRow("도급대상 시설·설비·장치 종류", s.handlingProcess, 50, true);
 
-    autoRow("도급내용",                    s.contractTitle,  40,       true);
+    autoRow("도급내용", s.contractTitle, 40, true);
 
-    autoRow("대상시설별 작업 프로세스",    processText,      procRowH, false);
+    autoRow("대상시설별 작업 프로세스", processText, procRowH, false);
 
     autoRow("도급 사유",
 
@@ -668,23 +646,19 @@ async function createPdf2(s) {
 
  
 
-    /* 하단 굵은 선 */
-
     doc.moveTo(L, y).lineTo(L + pageW, y).lineWidth(1.25).stroke();
 
     y += 24;
 
  
 
-    /* 별첨 */
-
     doc.fontSize(10).fillColor("#0f172a")
 
-       .text("2.  수급인이 보유한 개인보호장구 명세서 (별첨1)", L, y);
+       .text("2. 수급인이 보유한 개인보호장구 명세서 (별첨1)", L, y);
 
     y += 30;
 
-    doc.text("3.  수급인의 취급시설 및 인력명세서 (별첨2)", L, y);
+    doc.text("3. 수급인의 취급시설 및 인력명세서 (별첨2)", L, y);
 
  
 
@@ -890,7 +864,89 @@ SUBMITTER_EMAIL: ${s.submitterEmail}
 
 /* ===================== 2/2 메일 HTML ===================== */
 
-function buildHtml2(s) {
+function buildHtml2(s, verificationReport) {
+
+  // === [핵심 기능] AI 검증 결과를 HTML에 바인딩 ===
+
+  let reportHtml = `
+
+    <div style="margin-top:20px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+
+      <div style="background:#0f172a; padding:10px 14px; font-size:13px; font-weight:900; color:#fff;">
+
+        🧠 AI 서류 교차 검증 가채점 결과
+
+      </div>
+
+      <div style="padding:16px; background:#f8fafc;">
+
+  `;
+
+ 
+
+  if (!verificationReport || verificationReport.status === "ERROR") {
+
+    reportHtml += `
+
+      <div style="color:#ef4444; font-weight:bold; font-size:14px;">🔴 AI 검증 오류</div>
+
+      <p style="font-size:12px; color:#64748b; margin-top:4px;">
+
+        ${verificationReport ? verificationReport.message : "검증 결과를 가져올 수 없습니다."}
+
+      </p>
+
+    `;
+
+  } else {
+
+    const statusColor = verificationReport.status === "PASS" ? "#10b981" : "#f59e0b";
+
+    const statusText = verificationReport.status === "PASS" ? "🟢 적합 (PASS)" : "🟡 보완 필요 (FAIL/WARN)";
+
+    reportHtml += `
+
+      <div style="font-size:14px; font-weight:bold; color:${statusColor}; margin-bottom:8px;">
+
+        종합 판정: ${statusText}
+
+      </div>
+
+      <p style="font-size:12px; color:#334155; font-weight:bold; margin-bottom:10px;">
+
+        요약: ${verificationReport.summary}
+
+      </p>
+
+      <ul style="margin:0; padding-left:20px; font-size:12px; color:#475569; line-height:1.6;">
+
+    `;
+
+    if (verificationReport.details && Array.isArray(verificationReport.details)) {
+
+      verificationReport.details.forEach(detail => {
+
+        reportHtml += `<li style="margin-bottom:4px;">${detail}</li>`;
+
+      });
+
+    }
+
+    reportHtml += `</ul>`;
+
+  }
+
+ 
+
+  reportHtml += `
+
+      </div>
+
+    </div>
+
+  `;
+
+ 
 
   return `
 
@@ -898,7 +954,7 @@ function buildHtml2(s) {
 
     <div style="background:#0d9488;border-radius:12px 12px 0 0;padding:18px 22px;">
 
-      <div style="font-size:11px;color:#ccfbf1;font-weight:700;margin-bottom:4px;">도급신고 서류 접수 (2/2 교육이수증)</div>
+      <div style="font-size:11px;color:#ccfbf1;font-weight:700;margin-bottom:4px;">도급신고 서류 접수 (2/2 교육이수증 및 AI 검증)</div>
 
       <div style="font-size:20px;font-weight:900;color:#fff;">[${s.keyValue}] ${s.companyName}</div>
 
@@ -942,6 +998,12 @@ function buildHtml2(s) {
 
     </table>
 
+ 
+
+    ${reportHtml} <!-- 👈 여기에 AI 가채점 리포트 연동 -->
+
+ 
+
     <div style="margin-top:16px;padding:12px 16px;background:#f0fdfa;border-radius:0 0 12px 12px;border-top:1px solid #ccfbf1;font-size:11px;color:#94a3b8;">
 
       본 메일은 LG화학 여수공장 도급신고 자동접수 시스템에 의해 발송되었습니다.
@@ -972,7 +1034,7 @@ app.get("/test-mail", async (req, res) => {
 
       from: process.env.MAIL_FROM,
 
-      to:   process.env.MAIL_TO,
+      to: process.env.MAIL_TO,
 
       subject: "Resend 테스트",
 
@@ -998,6 +1060,12 @@ app.get("/test-mail", async (req, res) => {
 
 app.post("/submit", upload.any(), async (req, res) => {
 
+  // 가상 환경의 임시 파일 보관을 위한 경로 배열 정의
+
+  const tempFilesToClean = [];
+
+ 
+
   try {
 
     if (process.env.SUBMIT_TOKEN && req.body.token !== process.env.SUBMIT_TOKEN)
@@ -1006,7 +1074,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    const fileMap    = filesByField(req.files);
+    const fileMap = filesByField(req.files);
 
     const fileErrors = validateFiles(fileMap);
 
@@ -1016,13 +1084,19 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    const receiptId  = (req.body.keyValue || req.body.serialNumber || `TEMP-${yyyymmdd()}`)
+    const receiptId = (req.body.keyValue || req.body.serialNumber || `TEMP-${yyyymmdd()}`)
 
                      + `-${String(Date.now()).slice(-6)}`;
 
     const submission = buildSubmission(req.body, receiptId);
-    const compName = submission.company || req.body.comp || "업체명";
-    const kv         = '${submission.keyValue}_${compName}';
+
+    const compName = safeName(submission.companyName || req.body.comp || "업체명");
+
+   
+
+    // ⚠️ 버그 수정: 싱글 쿼테이션(')을 백틱(`) 템플릿 리터럴로 수정하여 변수 바인딩 정상화
+
+    const kv = `${submission.keyValue}_${compName}`;
 
  
 
@@ -1038,9 +1112,9 @@ app.post("/submit", upload.any(), async (req, res) => {
 
     const resend = new Resend(process.env.RESEND_API_KEY);
 
-    const to     = process.env.MAIL_TO;
+    const to = process.env.MAIL_TO;
 
-    const from   = process.env.MAIL_FROM;
+    const from = process.env.MAIL_FROM;
 
  
 
@@ -1052,6 +1126,82 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
+    /* ===================== [핵심 가교 로직] Buffer ➡️ 임시 파일 디스크 생성 ===================== */
+
+    const tempDir = path.join(__dirname, "temp");
+
+    if (!fs.existsSync(tempDir)) {
+
+      fs.mkdirSync(tempDir, { recursive: true });
+
+    }
+
+ 
+
+    const tempPaths = {
+
+      personnelList: path.join(tempDir, `${kv}_manpower.pdf`),
+
+      safetyCerts: path.join(tempDir, `${kv}_training.pdf`),
+
+      protectiveGear: path.join(tempDir, `${kv}_ppe.pdf`)
+
+    };
+
+ 
+
+    // 메모리 내 버퍼 데이터를 물리 디스크 파일로 저장 (Gemini가 직접 읽을 수 있게 함)
+
+    if (fileMap["manpowerList"]) {
+
+      fs.writeFileSync(tempPaths.personnelList, fileMap["manpowerList"].buffer);
+
+      tempFilesToClean.push(tempPaths.personnelList);
+
+    }
+
+    if (fileMap["trainingCertificate"]) {
+
+      fs.writeFileSync(tempPaths.safetyCerts, fileMap["trainingCertificate"].buffer);
+
+      tempFilesToClean.push(tempPaths.safetyCerts);
+
+    }
+
+    if (fileMap["ppeList"]) {
+
+      fs.writeFileSync(tempPaths.protectiveGear, fileMap["ppeList"].buffer);
+
+      tempFilesToClean.push(tempPaths.protectiveGear);
+
+    }
+
+ 
+
+    /* ===================== [AI 검증 엔진 구동] ===================== */
+
+    console.log("Gemini 1.5 Flash AI 서류 검증을 수행합니다...");
+
+    let verificationReport = { status: "ERROR", message: "자동 검증을 수행하지 못했습니다.", details: [] };
+
+   
+
+    try {
+
+      verificationReport = await runDocVerification(tempPaths);
+
+    } catch (vErr) {
+
+      console.error("AI 검증 모듈 실행 오류:", vErr);
+
+      verificationReport = { status: "ERROR", message: `검증 모듈 오류: ${vErr.message}`, details: [] };
+
+    }
+
+    console.log("AI 검증 완료. 판정:", verificationReport.status);
+
+ 
+
     /* 첨부파일 */
 
     const baseFileKeys = ["contract","pledge","manpowerList","employmentCertificate","ppeList","ppeCertificate"];
@@ -1060,9 +1210,9 @@ app.post("/submit", upload.any(), async (req, res) => {
 
       ...baseFileKeys.filter(k => fileMap[k]).map(k => makeAttachment(fileMap[k], kv)),
 
-      { filename: `${kv}_수급인정보.pdf`,  content: pdf1Buffer.toString("base64"), contentType: "application/pdf" },
+      { filename: `${kv}_수급인정보.pdf`, content: pdf1Buffer.toString("base64"), contentType: "application/pdf" },
 
-      { filename: `${kv}_도급계획서.pdf`,  content: pdf2Buffer.toString("base64"), contentType: "application/pdf" }
+      { filename: `${kv}_도급계획서.pdf`, content: pdf2Buffer.toString("base64"), contentType: "application/pdf" }
 
     ];
 
@@ -1074,7 +1224,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    /* 메일 발송 */
+    /* 메일 발송 (1/2 기본서류) */
 
     await resend.emails.send({
 
@@ -1090,15 +1240,17 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
+    /* 메일 발송 (2/2 교육이수증 및 AI 검증결과 동봉) */
+
     if (trainingAttachments.length > 0) {
 
       await resend.emails.send({
 
         from, to,
 
-        subject: `[${kv}] 도급신고 서류 제출 (2/2)`,
+        subject: `[${kv}] 도급신고 서류 제출 (2/2) - [AI검증: ${verificationReport.status}]`,
 
-        html: buildHtml2(submission),
+        html: buildHtml2(submission, verificationReport), // 👈 검증 리포트 객체 주입
 
         attachments: trainingAttachments
 
@@ -1108,13 +1260,43 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    return res.json({ ok: true, receiptId, keyValue: kv });
+    // 작업 종료 후 즉시 임시 파일 청소 (메모리 및 디스크 누수 방지)
+
+    tempFilesToClean.forEach(fPath => {
+
+      if (fs.existsSync(fPath)) {
+
+        try { fs.unlinkSync(fPath); } catch (_) {}
+
+      }
+
+    });
+
+ 
+
+    return res.json({ ok: true, receiptId, keyValue: kv, aiStatus: verificationReport.status });
 
  
 
   } catch (err) {
 
     console.error(err);
+
+   
+
+    // 에러 발생 시에도 생성되어 있던 임시 파일은 반드시 소거
+
+    tempFilesToClean.forEach(fPath => {
+
+      if (fs.existsSync(fPath)) {
+
+        try { fs.unlinkSync(fPath); } catch (_) {}
+
+      }
+
+    });
+
+ 
 
     return res.status(500).json({ ok: false, message: err.message || "서버 오류" });
 
@@ -1137,3 +1319,5 @@ app.use((err, req, res, next) => {
  
 
 app.listen(PORT, () => console.log(`Submit API listening on ${PORT}`));
+
+ 
