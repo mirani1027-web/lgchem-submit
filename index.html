@@ -96,7 +96,7 @@
 
     .help{position:relative;display:inline-flex;width:14px;height:14px;align-items:center;justify-content:center;border:1px solid #cbd5e1;border-radius:50%;color:#475569;background:white;font-size:9px;cursor:help;flex-shrink:0}
 
-    .help:hover:after{content:attr(data-help);position:absolute;left:50%;top:18px;transform:translateX(-50%);z-index:20;width:260px;padding:8px;border-radius:99px;background:#0f172a;color:#fff;font-size:10px;font-weight:500;line-height:1.5;white-space:pre-line;box-shadow:0 8px 20px rgba(15,23,42,.25)}
+    .help:hover:after{content:attr(data-help);position:absolute;left:50%;top:18px;transform:translateX(-50%);z-index:20;width:260px;padding:8px;border-radius:9px;background:#0f172a;color:#fff;font-size:10px;font-weight:500;line-height:1.5;white-space:pre-line;box-shadow:0 8px 20px rgba(15,23,42,.25)}
 
     .sales-wrap{position:relative}
 
@@ -136,7 +136,7 @@
 
     .file-group-items{display:grid;gap:6px}
 
-    .file-box{border:1px solid #e2e8f0;border-radius:99px;padding:7px;background:white}
+    .file-box{border:1px solid #e2e8f0;border-radius:9px;padding:7px;background:white}
 
     .file-title{font-size:11px;font-weight:800;margin-bottom:4px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 
@@ -179,6 +179,18 @@
     .btn-danger{color:#dc2626;background:#fff;border:1px solid #fecaca}
 
     .btn-danger:disabled{opacity:.35;cursor:not-allowed}
+
+   
+
+    /* AI 검증 버튼 및 경고 디자인 */
+
+    .btn-ai{background:#0d9488;color:white}
+
+    .btn-ai:disabled{opacity:.5;cursor:not-allowed}
+
+    .ai-report-box{margin-top:12px;border:1px solid #cbd5e1;border-radius:12px;padding:12px;background:#f0fdfa}
+
+    .ai-report-title{font-size:12px;font-weight:900;color:#0f766e;margin-bottom:6px;display:flex;align-items:center;gap:6px}
 
   </style>
 
@@ -430,7 +442,7 @@
 
        
 
-        <!-- ⚙️ 대칭형 도급 작업 정보 섹션 (수정된 그리드 시스템) -->
+        <!-- ⚙️ 대칭형 도급 작업 정보 섹션 -->
 
         <div class="sec-title">⚙️ 도급 작업 정보</div>
 
@@ -610,15 +622,23 @@
 
  
 
+    <!-- 하단 통제 바 -->
+
     <div class="bottom">
 
-      <p>제출 시 작성내용과 첨부파일이 담당자 이메일로 전송됩니다.</p>
+      <p id="bottomStatusText">⚠️ 제출 전 반드시 우측의 [AI 서류 사전 검증]을 수행하여 적합 판정을 받아야 합니다.</p>
 
       <div class="btns">
 
         <button type="button" class="btn-outline" id="resetBtn">초기화</button>
 
-        <button type="submit" class="btn-primary" id="submitBtn">제출</button>
+        <!-- 1단계: AI 사전 검증 가동 버튼 -->
+
+        <button type="button" class="btn-ai" id="aiVerifyBtn">🔍 AI 서류 사전 검증</button>
+
+        <!-- 2단계: 최종 제출 버튼 (기본 잠금 상태) -->
+
+        <button type="submit" class="btn-primary" id="submitBtn" disabled>제출</button>
 
       </div>
 
@@ -676,11 +696,11 @@ const requiredFields = [
 
   ["contractStart","공사시작 예정일"],
 
-  ["contractEnd","계약만료일"], // 👈 필수 검증 추가
+  ["contractEnd","계약만료일"],
 
   ["handlingMaterials","취급물질"],
 
-  ["handlingProcess","취급공정/취급시설"],
+ ["handlingProcess","취급공정/취급시설"],
 
   ["submitterName","제출자 이름"],
 
@@ -738,6 +758,8 @@ const attachmentGroups = [
 
 let steps = [{title:"",detail:""},{title:"",detail:""},{title:"",detail:""},{title:"",detail:""},{title:"",detail:""}];
 
+let isAiVerified = false; // AI 사전 검증 통과 여부 플래그
+
  
 
 function pad(n){return String(n).padStart(2,"0")}
@@ -762,8 +784,6 @@ startInput.min = minStart;
 
  
 
-// 공사시작일 변경 시 계약만료일 선택 범위 자동 조정
-
 startInput.addEventListener("change", function() {
 
   if (this.value) {
@@ -772,11 +792,35 @@ startInput.addEventListener("change", function() {
 
   }
 
+  resetAiVerification(); // 값 변경 시 AI 검증 초기화
+
   updateProgress();
 
 });
 
-endInput.addEventListener("change", updateProgress);
+endInput.addEventListener("change", function() {
+
+  resetAiVerification();
+
+  updateProgress();
+
+});
+
+ 
+
+function resetAiVerification() {
+
+  isAiVerified = false;
+
+  const submitBtn = document.getElementById("submitBtn");
+
+  submitBtn.disabled = true;
+
+  document.getElementById("bottomStatusText").textContent = "⚠️ 서류 정보가 변경되었습니다. 제출 전 반드시 AI 사전 검증을 다시 통과해야 합니다.";
+
+  document.getElementById("bottomStatusText").style.color = "#ef4444";
+
+}
 
  
 
@@ -808,6 +852,8 @@ function setupPhone(id,type){
 
     this.value = type==="biz" ? fmtBiz(r.substring(0,10)) : fmtPhone(r.substring(0,11));
 
+    resetAiVerification();
+
     updateProgress();
 
   });
@@ -828,6 +874,8 @@ document.getElementById("establishYear").addEventListener("input",function(){
 
   this.value = this.value.replace(/\D/g,"").substring(0,4);
 
+  resetAiVerification();
+
   updateProgress();
 
 });
@@ -837,6 +885,8 @@ document.getElementById("establishYear").addEventListener("input",function(){
 document.getElementById("salesAmount").addEventListener("input",function(){
 
   this.value = this.value.replace(/\D/g,"");
+
+  resetAiVerification();
 
   updateProgress();
 
@@ -862,15 +912,15 @@ function updateMailSubject(){
 
 }
 
-function updateSerial(){
+ 
+
+document.getElementById("companyName").addEventListener("input", () => {
+
+  resetAiVerification();
 
   updateMailSubject();
 
-}
-
- 
-
-document.getElementById("companyName").addEventListener("input", updateMailSubject);
+});
 
  
 
@@ -944,6 +994,8 @@ function renderFiles(){
 
         }
 
+        resetAiVerification();
+
         updateProgress();
 
       });
@@ -1000,9 +1052,9 @@ function renderSteps(){
 
  
 
-window.chgStep = function(i,f,v){ steps[i][f]=v; updateStepCount(); updateProgress(); };
+window.chgStep = function(i,f,v){ steps[i][f]=v; updateStepCount(); updateProgress(); resetAiVerification(); };
 
-window.removeStep = function(i){ if(steps.length<=5) return; steps.splice(i,1); renderSteps(); updateProgress(); };
+window.removeStep = function(i){ if(steps.length<=5) return; steps.splice(i,1); renderSteps(); updateProgress(); resetAiVerification(); };
 
  
 
@@ -1013,6 +1065,8 @@ document.getElementById("addStepBtn").addEventListener("click",function(){
   renderSteps();
 
   updateProgress();
+
+  resetAiVerification();
 
 });
 
@@ -1256,9 +1310,163 @@ document.getElementById("submitForm").addEventListener("input", updateProgress);
 
  
 
+/* ===================== [★ 신규 기능] 1단계: AI 서류 정합성 검증 엔진 가동 ===================== */
+
+document.getElementById("aiVerifyBtn").addEventListener("click", async function() {
+
+  const missing = validate();
+
+  const msg = document.getElementById("message");
+
+ 
+
+  if (missing.length) {
+
+    msg.className = "message bad show";
+
+    msg.textContent = "AI 검증 전 필수 입력란 및 첨부서류를 모두 등록해야 합니다: " + missing.join(", ");
+
+    window.scrollTo({top: 0, behavior: "smooth"});
+
+    return;
+
+  }
+
+ 
+
+  updateHidden();
+
+  const verifyBtn = document.getElementById("aiVerifyBtn");
+
+  const submitBtn = document.getElementById("submitBtn");
+
+ 
+
+  verifyBtn.disabled = true;
+
+  verifyBtn.textContent = "AI 분석 및 가채점 진행 중 (약 5~10초)...";
+
+  msg.className = "message ok show";
+
+  msg.textContent = "AI가 업로드된 모든 서류(인력명세서, 교육이수증, 보호구명세서, 재직증명서)의 텍스트와 사진 레이아웃을 정밀 교차 검증하고 있습니다. 창을 닫지 마세요.";
+
+ 
+
+  try {
+
+    const fd = new FormData(document.getElementById("submitForm"));
+
+    const res = await fetch("https://lgchem-submit.onrender.com/verify-docs", { method: "POST", body: fd });
+
+    const data = await res.json().catch(() => ({}));
+
+ 
+
+    if (!res.ok || !data.ok) throw new Error(data.message || "AI 검증 통신 실패");
+
+ 
+
+    const report = data.report;
+
+    let reportHtml = `
+
+      <div class="ai-report-box">
+
+        <div class="ai-report-title">🧠 AI 사전 교차 검증 결과 보고서</div>
+
+        <p style="font-size:12px; font-weight:bold; margin:0 0 8px; color:${report.status === 'PASS' ? '#0f766e' : '#b45309'}">
+
+          종합 판정: ${report.status === 'PASS' ? '🟢 적합 (PASS) - 제출 가능' : '🔴 보완 필요 (FAIL) - 제출 잠금'}
+
+        </p>
+
+        <p style="font-size:11px; color:#334155; margin:0 0 10px;">요약: ${report.summary}</p>
+
+        <ul style="margin:0; padding-left:18px; font-size:11px; color:#475569; line-height:1.5;">
+
+    `;
+
+   
+
+    report.details.forEach(detail => {
+
+      reportHtml += `<li>${detail}</li>`;
+
+    });
+
+    reportHtml += `</ul></div>`;
+
+ 
+
+    if (report.status === "PASS") {
+
+      isAiVerified = true;
+
+      submitBtn.disabled = false; // 최종 제출 잠금 해제!
+
+      msg.className = "message ok show";
+
+      msg.innerHTML = "🎉 AI 사전 서류 검증을 완벽하게 통과했습니다! 하단의 [제출] 버튼을 클릭하면 최종 도급신고 접수가 완료됩니다." + reportHtml;
+
+      document.getElementById("bottomStatusText").textContent = "🟢 AI 검증 통과 완료! 지금 제출할 수 있습니다.";
+
+      document.getElementById("bottomStatusText").style.color = "#16a34a";
+
+    } else {
+
+      isAiVerified = false;
+
+      submitBtn.disabled = true; // 최종 제출 버튼 계속 잠금
+
+      msg.className = "message bad show";
+
+      msg.innerHTML = "⚠️ 일부 서류에 누락, 만료 또는 레이아웃(사진이탈) 오류가 존재하여 최종 제출이 불가능합니다. 아래 분석 결과를 보고 서류를 교체해 주세요." + reportHtml;
+
+      document.getElementById("bottomStatusText").textContent = "❌ AI 서류 검증 실패. 오류 사항을 보완하고 다시 검증을 진행해 주세요.";
+
+      document.getElementById("bottomStatusText").style.color = "#dc2626";
+
+    }
+
+ 
+
+  } catch (err) {
+
+    msg.className = "message bad show";
+
+    msg.textContent = "AI 연산 서버 통신 실패: " + err.message;
+
+  } finally {
+
+    verifyBtn.disabled = false;
+
+    verifyBtn.textContent = "🔍 AI 서류 사전 검증";
+
+    window.scrollTo({top: 0, behavior: "smooth"});
+
+  }
+
+});
+
+ 
+
+/* ===================== 2단계: 최종 제출 프로세스 ===================== */
+
 document.getElementById("submitForm").addEventListener("submit", async function(e){
 
   e.preventDefault();
+
+ 
+
+  if (!isAiVerified) {
+
+    alert("제출 전 반드시 [AI 서류 사전 검증]을 통과해야 합니다.");
+
+    return;
+
+  }
+
+ 
 
   const missing = validate();
 
@@ -1268,13 +1476,15 @@ document.getElementById("submitForm").addEventListener("submit", async function(
 
     msg.className = "message bad show";
 
-    msg.textContent = "미작성/미첨부/오류: "+missing.join(", ");
+    msg.textContent = "오류: "+missing.join(", ");
 
     window.scrollTo({top:0,behavior:"smooth"});
 
     return;
 
   }
+
+ 
 
   updateHidden();
 
@@ -1286,7 +1496,9 @@ document.getElementById("submitForm").addEventListener("submit", async function(
 
   msg.className = "message ok show";
 
-  msg.textContent = "제출 처리 중입니다. 첫 제출 시 서버 기동으로 최대 1분 소요될 수 있습니다. 창을 닫지 마세요.";
+  msg.textContent = "최종 도급신고서 생성 및 이메일 전송 중입니다. 잠시만 기다려 주세요...";
+
+ 
 
   try{
 
@@ -1300,7 +1512,9 @@ document.getElementById("submitForm").addEventListener("submit", async function(
 
     msg.className = "message ok show";
 
-    msg.textContent = "제출 완료! 접수번호: "+(data.receiptId || "확인 필요");
+    msg.textContent = "🎉 최종 제출 완료! 정상 접수되었습니다. 접수번호: "+(data.receiptId || "확인 필요");
+
+    document.getElementById("bottomStatusText").textContent = "🟢 최종 도급신고서 접수 완료";
 
   } catch(err){
 
@@ -1308,11 +1522,11 @@ document.getElementById("submitForm").addEventListener("submit", async function(
 
     msg.textContent = "오류: "+err.message;
 
-  } finally{
-
     btn.disabled = false;
 
     btn.textContent = "제출";
+
+  } finally{
 
     window.scrollTo({top:0,behavior:"smooth"});
 
@@ -1333,6 +1547,8 @@ document.getElementById("resetBtn").addEventListener("click",function(){
   renderSteps();
 
   renderFiles();
+
+  resetAiVerification();
 
   updateProgress();
 
@@ -1431,5 +1647,3 @@ initPage();
 </body>
 
 </html>
-
- 
