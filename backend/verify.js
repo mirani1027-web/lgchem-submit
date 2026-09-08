@@ -1,10 +1,8 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai"); // 👈 1. 올바른 클래스명으로 수정
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const fs = require("fs");
 
  
-
-// 2. 생성자 호출 방식 수정: 객체 { apiKey: ... } 가 아닌 API Key 문자열을 직접 전달합니다.
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -12,13 +10,11 @@ const ai = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
  
 
-// PDF를 Gemini 전송용 Base64로 변환하는 함수
-
 function fileToGenerativePart(path, mimeType) {
 
   if (!fs.existsSync(path)) {
 
-    console.log(`[AI 검증] 물리 파일 없음: ${path}`);
+    console.log(`[AI 검증] 파일 없음: ${path}`);
 
     return null;
 
@@ -42,21 +38,19 @@ function fileToGenerativePart(path, mimeType) {
 
 async function runDocVerification(files) {
 
-  console.log("=== AI 서류 검증 시작 ===");
+  console.log("=== AI 사전 검증 가동 ===");
 
  
 
-  // API Key 누락 시 안전장치
-
   if (!ai) {
-
-    console.error("❌ 에러: GEMINI_API_KEY 환경변수가 존재하지 않습니다.");
 
     return {
 
       status: "ERROR",
 
-      message: "서버에 AI API Key가 설정되지 않아 자동 검증을 진행할 수 없습니다."
+      summary: "서버에 GEMINI_API_KEY가 구성되지 않았습니다.",
+
+      details: ["시스템 구성 오류: API Key 누락"]
 
     };
 
@@ -64,89 +58,131 @@ async function runDocVerification(files) {
 
  
 
-  try {
-
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
  
 
-    // 분석할 PDF 파일들을 안전하게 변환
+  const personnelPdf = fileToGenerativePart(files.personnelList, "application/pdf"); // 수급인인력명세서
 
-    const personnelPdf = fileToGenerativePart(files.personnelList, "application/pdf"); // 수급인인력명세서
+  const certsPdf = fileToGenerativePart(files.safetyCerts, "application/pdf");      // 교육이수증
 
-    const certsPdf = fileToGenerativePart(files.safetyCerts, "application/pdf");      // 교육이수증
+  const gearPdf = fileToGenerativePart(files.protectiveGear, "application/pdf");    // 보호구명세서
 
-    const gearPdf = fileToGenerativePart(files.protectiveGear, "application/pdf");    // 보호구명세서
-
- 
-
-    // 필수 서류가 누락된 경우 즉시 예외 처리하여 서버 다운(254) 방지
-
-    if (!personnelPdf || !certsPdf) {
-
-      return {
-
-        status: "ERROR",
-
-        message: "필수 서류(인력명세서 또는 교육이수증) 파일이 생성되지 않았습니다."
-
-      };
-
-    }
+  const employmentPdf = fileToGenerativePart(files.employmentCertificate, "application/pdf"); // 재직증명서
 
  
 
-    // Gemini 교차 검증용 프롬프트
+  if (!personnelPdf || !certsPdf || !gearPdf || !employmentPdf) {
 
-    const prompt = `
+    return {
 
-      너는 도급신고 서류를 검증하는 전문 AI야.
+      status: "FAIL",
 
-      제공된 [수급인인력명세서], [교육이수증], [보호구명세서] PDF 파일들을 분석해서 교차 검증에 필요한 아래 데이터들을 정확히 추출해줘.
+      summary: "검증에 필요한 필수 서류 파일 중 일부가 누락되었습니다.",
 
-    
+      details: ["❌ 필수 서류 물리 파일 미생성"]
 
-      반드시 아래 JSON 형식으로만 답변해야 해. 다른 설명이나 텍스트(예: \`\`\`json)는 일절 포함하지 마.
+    };
 
-    
+  }
 
-      {
+ 
 
-        "personnelList": [
+  const prompt = `
 
-          { "name": "이름", "birth": "생년월일(YYMMDD)", "certNo": "이수번호" }
+    너는 도급신고 서류를 현미경처럼 정밀하게 검토하는 전문 심사관 AI야.
 
-        ],
+    제공된 [수급인인력명세서], [교육이수증], [보호구명세서], [재직증명서] PDF를 시각적, 텍스트적으로 엄격히 대조하여 교차 검증을 수행하고 결과를 JSON으로만 답변해줘.
 
-        "safetyCertificates": [
+ 
 
-          { "name": "이름", "birth": "생년월일(YYMMDD)", "certNo": "이수번호", "completeYear": "교육이수연도(YYYY)" }
+    [검증 규칙 규칙]
 
-        ],
+    1. 서류 오첨부 검증 (File Slot Validation):
 
-        "protectiveGearCount": {
+       - 각 파일 슬롯에 진짜 제 서류가 들어왔는지 검사해라. (예: 수급인인력명세서 슬롯에 엉뚱한 계약서가 업로드되었는지 확인)
 
-          "helmets": "안전모수량(숫자만)",
+    2. 인원수 삼각 대조 (Triple-Count Match):
 
-          "boots": "안전화수량(숫자만)"
+       - [수급인인력명세서의 총 작업인원수]와 [제출된 교육이수증의 개수(혹은 명단 수)], 그리고 [재직증명서상의 총 인원수]가 모두 일치하는지 대조해라.
 
-        }
+    3. 인적사항 1:1 매칭 (Identity Cross-Match):
+
+       - [수급인인력명세서]에 기재된 모든 사람의 [이름, 생년월일]이 각각의 [교육이수증]에 적힌 [이름, 생년월일]과 정확히 일치하는지 1:1로 확인해라.
+
+    4. 교육이수일 유효기간 필터 (3-Year Expiration):
+
+       - 교육이수증에 적힌 수료년도가 최근 3개년(2024년, 2025년, 2026년) 이내인지 검증해라. 2023년 이전 이수증은 기간 만료로 처리해라.
+
+    5. 보호구 수량 적정성 대조 (PPE Count Match):
+
+       - [보호구명세서] 상의 개인보호구(안전모, 안전화 등) 지급 수량이 [수급인인력명세서의 인원수]보다 크거나 같은지 대조해라. 인원수보다 적으면 실패다.
+
+    6. 보호구 사진 칸 이탈 검증 (Layout Overflow Check) [★가장 중요]:
+
+       - [보호구명세서] PDF의 시각적 레이아웃을 정밀 스캔해라.
+
+       - 각 보호구 사진이 표(Table)의 지정된 테두리 칸(Cell) 영역을 벗어나 삐져나와 있거나, 선을 침범하거나, 주변 글자를 가려 조잡하게 배치되어 있다면 반드시 '작성양식 오류'로 감지하고 ppePhotoOverflow를 true로 설정해라.
+
+ 
+
+    반드시 아래 JSON 형식으로만 출력하고, 다른 설명이나 백틱(\`\`\`json)은 포함하지 마라.
+
+    {
+
+      "fileSlots": {
+
+        "personnelListValid": true,
+
+        "safetyCertsValid": true,
+
+        "protectiveGearValid": true,
+
+        "employmentValid": true
+
+      },
+
+      "tripleCount": { "manpowerCount": 16, "trainingCount": 16, "employmentCount": 16, "isMatched": true },
+
+      "ppePhotoOverflow": false,
+
+      "ppePhotoOverflowReason": "",
+
+      "validationStatus": "PASS", // PASS 또는 FAIL
+
+      "summary": "종합 검증 요약 설명글",
+
+      "details": [
+
+        "✅ [규칙 1] 모든 서류가 제 위치에 올바르게 첨부되었습니다.",
+
+        "✅ [규칙 2] 인원수 삼각 대조 완료 (16명 일치)",
+
+        "❌ [규칙 4] '홍길동'의 교육이수증 수료년도가 2023년으로 유효 기한을 초과하였습니다."
+
+      ],
+
+      "extractedData": {
+
+        "personnelList": [{ "name": "이름", "birth": "생년월일", "certNo": "이수번호" }],
+
+        "safetyCertificates": [{ "name": "이름", "birth": "생년월일", "certNo": "이수번호", "completeYear": "YYYY" }],
+
+        "protectiveGearCount": { "helmets": "수량", "boots": "수량" }
 
       }
 
-    `;
+    }
+
+  `;
 
  
 
-    // API 호출 전송
+  try {
 
-    const result = await model.generateContent([prompt, personnelPdf, certsPdf, gearPdf].filter(Boolean));
+    const result = await model.generateContent([personnelPdf, certsPdf, gearPdf, employmentPdf, prompt]);
 
     const responseText = result.response.text();
-
-    
-
-    // JSON 데이터 정제 및 파싱
 
     const cleanJsonText = responseText.replace(/```json|```/g, "").trim();
 
@@ -154,149 +190,55 @@ async function runDocVerification(files) {
 
  
 
-    // 5대 룰 엔진 실행 후 리포트 반환
+    // AI 자체 판정 및 추가 룰 가공
 
-    return executeValidationRules(data);
+    let report = {
+
+      status: data.validationStatus === "PASS" ? "PASS" : "FAIL",
+
+      summary: data.summary,
+
+      details: data.details,
+
+      extractedData: data.extractedData
+
+    };
+
+ 
+
+    // 보호구 사진 칸 이탈 감지 시 무조건 탈락(FAIL) 처리
+
+    if (data.ppePhotoOverflow) {
+
+      report.status = "FAIL";
+
+      report.summary = "보호구명세서의 사진이 칸을 이탈하여 작성양식 오류가 감지되었습니다.";
+
+      report.details.push(`❌ [양식오류] 보호구 사진 레이아웃 이탈 감지: ${data.ppePhotoOverflowReason}`);
+
+    }
+
+ 
+
+    return report;
 
  
 
   } catch (error) {
 
-    console.error("Gemini 검증 중 치명적 에러 발생:", error);
+    console.error("Gemini 정밀 사전 검증 중 오류:", error);
 
     return {
 
       status: "ERROR",
 
-      message: `AI 분석 연산 오류: ${error.message}`
+      message: `AI 분석 연산 오류: ${error.message}`,
+
+      details: ["❌ AI 연산 엔진 충돌"]
 
     };
 
   }
-
-}
-
- 
-
-// 5대 룰 검증 알고리즘
-
-function executeValidationRules(data) {
-
-  let report = {
-
-    status: "PASS",
-
-    summary: "모든 서류가 정상 검증되었습니다.",
-
-    details: []
-
-  };
-
- 
-
-  const pList = data.personnelList || [];
-
-  const cList = data.safetyCertificates || [];
-
-  const gear = data.protectiveGearCount || { helmets: 0, boots: 0 };
-
-  const currentYear = new Date().getFullYear();
-
- 
-
-  // 규칙 1: 명세서 인원과 이수증 개수 일치 여부
-
-  if (pList.length !== cList.length) {
-
-    report.status = "FAIL";
-
-    report.details.push(`❌ [규칙 1] 명세서 인원(${pList.length}명)과 제출된 이수증 개수(${cList.length}개)가 불일치합니다.`);
-
-  } else {
-
-    report.details.push(`✅ [규칙 1] 인원 및 이수증 수량 일치 확인 (${pList.length}명)`);
-
-  }
-
- 
-
-  // 규칙 2: 인적사항 1:1 교차 매칭 (이름, 생년월일, 이수번호)
-
-  pList.forEach(p => {
-
-    const match = cList.find(c => c.name === p.name && c.birth === p.birth);
-
-    if (!match) {
-
-      report.status = "FAIL";
-
-      report.details.push(`❌ [규칙 2] 명세서의 '${p.name}(${p.birth})'와 일치하는 교육이수증이 없습니다.`);
-
-    } else if (match.certNo !== p.certNo) {
-
-      report.status = "FAIL";
-
-      report.details.push(`❌ [규칙 2] '${p.name}'의 이수번호가 다릅니다. (명세서: ${p.certNo} vs 이수증: ${match.certNo})`);
-
-    } else {
-
-      report.details.push(`✅ [규칙 2] '${p.name}' 인적사항 및 이수번호 교차 검증 완료`);
-
-    }
-
-  });
-
- 
-
-  // 규칙 3: 교육이수연도 3개년 검증
-
-  cList.forEach(c => {
-
-    const year = parseInt(c.completeYear);
-
-    if (isNaN(year) || year < currentYear - 2 || year > currentYear) {
-
-      report.status = "FAIL";
-
-      report.details.push(`❌ [규칙 3] '${c.name}'의 교육이수일(${c.completeYear}년)은 유효 기간(최근 3개년)을 초과했습니다.`);
-
-    } else {
-
-      report.details.push(`✅ [규칙 3] '${c.name}' 교육이수일 유효성 통과 (${c.completeYear}년)`);
-
-    }
-
-  });
-
- 
-
-  // 규칙 4: 보호구 수량 검증 (안전모 수량 >= 인원수)
-
-  const helmetCount = parseInt(gear.helmets) || 0;
-
-  if (helmetCount < pList.length) {
-
-    report.status = "FAIL";
-
-    report.details.push(`❌ [규칙 4] 보호구(안전모) 수량이 인원보다 부족합니다. (인원: ${pList.length}명, 안전모: ${helmetCount}개)`);
-
-  } else {
-
-    report.details.push(`✅ [규칙 4] 보호구 수량 적정성 통과 (안전모: ${helmetCount}개)`);
-
-  }
-
- 
-
-  if (report.status === "FAIL") {
-
-    report.summary = "일부 서류에 누락 또는 검증 실패 항목이 존재합니다. 보완이 필요합니다.";
-
-  }
-
- 
-
-  return report;
 
 }
 
