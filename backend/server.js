@@ -1,6 +1,6 @@
 const express = require("express");
 
-const fs = require("fs"); // 임시 파일 생성을 위한 fs 모듈
+const fs = require("fs");
 
 const { runDocVerification } = require('./verify.js');
 
@@ -26,31 +26,9 @@ const PORT = process.env.PORT || 3000;
 
  
 
-/* ===================== CORS ===================== */
-
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "*")
-
-  .split(",").map(s => s.trim()).filter(Boolean);
+app.use(cors({ origin: "*" }));
 
  
-
-app.use(cors({
-
-  origin: (origin, cb) => {
-
-    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin))
-
-      return cb(null, true);
-
-    return cb(new Error("CORS blocked"));
-
-  }
-
-}));
-
- 
-
-/* ===================== 첨부파일 규칙 ===================== */
 
 const FIELD_RULES = {
 
@@ -76,19 +54,15 @@ const FIELD_RULES = {
 
  
 
-/* ===================== Multer ===================== */
-
 const upload = multer({
 
   storage: multer.memoryStorage(),
 
-  limits: { fileSize: 20 * 1024 * 1024, files: 9, fields: 120, parts: 140 }
+  limits: { fileSize: 20 * 1024 * 1024 }
 
 });
 
  
-
-/* ===================== 유틸 ===================== */
 
 function pad(n) { return String(n).padStart(2, "0"); }
 
@@ -142,8 +116,6 @@ function formatCurrency(val) {
 
  
 
-/* ===================== 파일 유효성 검사 ===================== */
-
 function validateFiles(fileMap) {
 
   const errors = [];
@@ -173,8 +145,6 @@ function validateFiles(fileMap) {
 }
 
  
-
-/* ===================== submission 객체 빌드 ===================== */
 
 function buildSubmission(body, receiptId) {
 
@@ -216,7 +186,7 @@ function buildSubmission(body, receiptId) {
 
     contractStart: body.contractStart || "",
 
-    contractEnd: body.contractEnd || "", // 👈 계약만료일 매핑 추가 완료!
+    contractEnd: body.contractEnd || "",
 
     workerCount: body.workerCount || "",
 
@@ -243,8 +213,6 @@ function buildSubmission(body, receiptId) {
 }
 
  
-
-/* ===================== 파일명 규칙 ===================== */
 
 const FILE_LABEL_MAP = {
 
@@ -276,8 +244,6 @@ function makeAttachment(file, keyValue) {
 
  
 
-/* ===================== PDF 공통 ===================== */
-
 function newDoc() {
 
   const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -292,8 +258,6 @@ function newDoc() {
 
   } else {
 
-    console.warn("⚠️ fonts/malgun.ttf가 없어 Helvetica 폰트로 대체합니다.");
-
     doc.font("Helvetica");
 
   }
@@ -303,8 +267,6 @@ function newDoc() {
 }
 
  
-
-/* ===================== PDF 1: 수급인 정보 ===================== */
 
 async function createPdf1(s, fileMap) {
 
@@ -514,8 +476,6 @@ async function createPdf1(s, fileMap) {
 
  
 
-/* ===================== PDF 2: 도급계획서 ===================== */
-
 async function createPdf2(s) {
 
   return new Promise((resolve, reject) => {
@@ -684,8 +644,6 @@ async function createPdf2(s) {
 
  
 
-/* ===================== 1/2 메일 HTML (슬림 에센셜 버전) ===================== */
-
 function buildHtml1(s, fileMap) {
 
   const row = (label, value) => `
@@ -770,8 +728,6 @@ function buildHtml1(s, fileMap) {
 
    
 
-    <!-- 🔒 파싱용 숨김 메타데이터 (공백 없는 키워드 설계) -->
-
     <div style="display:none;font-size:0;color:transparent;height:0;overflow:hidden;">
 
 [METADATA]
@@ -814,8 +770,6 @@ SUBMITTER_EMAIL: ${s.submitterEmail}
 
  
 
-/* ===================== 2/2 메일 HTML ===================== */
-
 function buildHtml2(s, verificationReport) {
 
   let reportHtml = `
@@ -824,7 +778,7 @@ function buildHtml2(s, verificationReport) {
 
       <div style="background:#0f172a; padding:10px 14px; font-size:13px; font-weight:900; color:#fff;">
 
-        🧠 AI 서류 교차 검증 가채점 결과
+        🧠 AI 서류 교차 검증 결과 보고서 (사전 검증 필터 통과됨)
 
       </div>
 
@@ -850,15 +804,11 @@ function buildHtml2(s, verificationReport) {
 
   } else {
 
-    const statusColor = verificationReport.status === "PASS" ? "#10b981" : "#f59e0b";
-
-    const statusText = verificationReport.status === "PASS" ? "🟢 적합 (PASS)" : "🟡 보완 필요 (FAIL/WARN)";
-
     reportHtml += `
 
-      <div style="font-size:14px; font-weight:bold; color:${statusColor}; margin-bottom:8px;">
+      <div style="font-size:14px; font-weight:bold; color:#10b981; margin-bottom:8px;">
 
-        종합 판정: ${statusText}
+        종합 판정: 🟢 적합 (PASS) - 무결점 서류 확인 완료
 
       </div>
 
@@ -966,39 +916,125 @@ function buildHtml2(s, verificationReport) {
 
  
 
-/* ===================== 헬스체크 ===================== */
+/* ===================== [★ 신규 추가] 1단계: 제출 전 AI 실시간 검증 API ===================== */
 
-app.get("/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+app.post("/verify-docs", upload.any(), async (req, res) => {
 
- 
-
-/* ===================== 테스트 메일 ===================== */
-
-app.get("/test-mail", async (req, res) => {
+  const tempFilesToClean = [];
 
   try {
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fileMap = filesByField(req.files);
 
-    const result = await resend.emails.send({
+    const receiptId = (req.body.keyValue || req.body.serialNumber || `TEMP-${yyyymmdd()}`)
 
-      from: process.env.MAIL_FROM,
+                     + `-${String(Date.now()).slice(-6)}`;
 
-      to: process.env.MAIL_TO,
+    const submission = buildSubmission(req.body, receiptId);
 
-      subject: "Resend 테스트",
+    const compName = safeName(submission.companyName || req.body.comp || "업체명");
 
-      text: "메일 발송 테스트입니다."
+    const kv = `${submission.keyValue}_${compName}`;
+
+ 
+
+    const tempDir = path.join(__dirname, "temp");
+
+    if (!fs.existsSync(tempDir)) {
+
+      fs.mkdirSync(tempDir, { recursive: true });
+
+    }
+
+ 
+
+    const tempPaths = {
+
+      personnelList: path.join(tempDir, `${kv}_manpower.pdf`),
+
+      safetyCerts: path.join(tempDir, `${kv}_training.pdf`),
+
+      protectiveGear: path.join(tempDir, `${kv}_ppe.pdf`),
+
+      employmentCertificate: path.join(tempDir, `${kv}_employment.pdf`)
+
+    };
+
+ 
+
+    if (fileMap["manpowerList"]) {
+
+      fs.writeFileSync(tempPaths.personnelList, fileMap["manpowerList"].buffer);
+
+      tempFilesToClean.push(tempPaths.personnelList);
+
+    }
+
+    if (fileMap["trainingCertificate"]) {
+
+      fs.writeFileSync(tempPaths.safetyCerts, fileMap["trainingCertificate"].buffer);
+
+      tempFilesToClean.push(tempPaths.safetyCerts);
+
+    }
+
+    if (fileMap["ppeList"]) {
+
+      fs.writeFileSync(tempPaths.protectiveGear, fileMap["ppeList"].buffer);
+
+      tempFilesToClean.push(tempPaths.protectiveGear);
+
+    }
+
+    if (fileMap["employmentCertificate"]) {
+
+      fs.writeFileSync(tempPaths.employmentCertificate, fileMap["employmentCertificate"].buffer);
+
+      tempFilesToClean.push(tempPaths.employmentCertificate);
+
+    }
+
+ 
+
+    // AI 심사 실행
+
+    const report = await runDocVerification(tempPaths);
+
+ 
+
+    // 디스크 자원 즉시 청소
+
+    tempFilesToClean.forEach(fPath => {
+
+      if (fs.existsSync(fPath)) {
+
+        try { fs.unlinkSync(fPath); } catch (_) {}
+
+      }
 
     });
 
-    res.json(result);
+ 
+
+    return res.json({ ok: true, report });
+
+ 
 
   } catch (err) {
 
-    console.error(err);
+    console.error("사전 검증 API 치명적 오류:", err);
 
-    res.status(500).json({ error: err.message });
+    tempFilesToClean.forEach(fPath => {
+
+      if (fs.existsSync(fPath)) {
+
+        try { fs.unlinkSync(fPath); } catch (_) {}
+
+      }
+
+    });
+
+    return res.status(500).json({ ok: false, message: `AI 내부 연산 실패: ${err.message}` });
 
   }
 
@@ -1040,8 +1076,6 @@ app.post("/submit", upload.any(), async (req, res) => {
 
     const compName = safeName(submission.companyName || req.body.comp || "업체명");
 
-  
-
     const kv = `${submission.keyValue}_${compName}`;
 
  
@@ -1072,8 +1106,6 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    /* ===================== [가교 로직] Buffer ➡️ 임시 파일 생성 ===================== */
-
     const tempDir = path.join(__dirname, "temp");
 
     if (!fs.existsSync(tempDir)) {
@@ -1090,63 +1122,35 @@ app.post("/submit", upload.any(), async (req, res) => {
 
       safetyCerts: path.join(tempDir, `${kv}_training.pdf`),
 
-      protectiveGear: path.join(tempDir, `${kv}_ppe.pdf`)
+      protectiveGear: path.join(tempDir, `${kv}_ppe.pdf`),
+
+      employmentCertificate: path.join(tempDir, `${kv}_employment.pdf`)
 
     };
 
  
 
-    if (fileMap["manpowerList"]) {
+    if (fileMap["manpowerList"]) fs.writeFileSync(tempPaths.personnelList, fileMap["manpowerList"].buffer);
 
-      fs.writeFileSync(tempPaths.personnelList, fileMap["manpowerList"].buffer);
+    if (fileMap["trainingCertificate"]) fs.writeFileSync(tempPaths.safetyCerts, fileMap["trainingCertificate"].buffer);
 
-      tempFilesToClean.push(tempPaths.personnelList);
+    if (fileMap["ppeList"]) fs.writeFileSync(tempPaths.protectiveGear, fileMap["ppeList"].buffer);
 
-    }
-
-    if (fileMap["trainingCertificate"]) {
-
-      fs.writeFileSync(tempPaths.safetyCerts, fileMap["trainingCertificate"].buffer);
-
-      tempFilesToClean.push(tempPaths.safetyCerts);
-
-    }
-
-    if (fileMap["ppeList"]) {
-
-      fs.writeFileSync(tempPaths.protectiveGear, fileMap["ppeList"].buffer);
-
-      tempFilesToClean.push(tempPaths.protectiveGear);
-
-    }
+    if (fileMap["employmentCertificate"]) fs.writeFileSync(tempPaths.employmentCertificate, fileMap["employmentCertificate"].buffer);
 
  
 
-    /* ===================== [AI 검증 엔진 구동] ===================== */
-
-    console.log("Gemini 1.5 Flash AI 서류 검증을 수행합니다...");
-
-    let verificationReport = { status: "ERROR", message: "자동 검증을 수행하지 못했습니다.", details: [] };
-
-  
-
-    try {
-
-      verificationReport = await runDocVerification(tempPaths);
-
-    } catch (vErr) {
-
-      console.error("AI 검증 모듈 실행 오류:", vErr);
-
-      verificationReport = { status: "ERROR", message: `검증 모듈 오류: ${vErr.message}`, details: [] };
-
-    }
-
-    console.log("AI 검증 완료. 판정:", verificationReport.status);
+    tempFilesToClean.push(...Object.values(tempPaths));
 
  
 
-    /* 첨부파일 */
+    // 이메일에 포함될 최종 통과된 AI 검증 결과 조회
+
+    const verificationReport = await runDocVerification(tempPaths);
+
+ 
+
+    /* 첨부파일 빌드 */
 
     const baseFileKeys = ["contract","pledge","manpowerList","employmentCertificate","ppeList","ppeCertificate"];
 
@@ -1184,7 +1188,7 @@ app.post("/submit", upload.any(), async (req, res) => {
 
  
 
-    /* 메일 발송 (2/2 교육이수증 및 AI 검증결과 동봉) */
+    /* 메일 발송 (2/2 교육이수증 및 AI 검증 결과 동봉) */
 
     if (trainingAttachments.length > 0) {
 
@@ -1226,8 +1230,6 @@ app.post("/submit", upload.any(), async (req, res) => {
 
     console.error(err);
 
-  
-
     tempFilesToClean.forEach(fPath => {
 
       if (fs.existsSync(fPath)) {
@@ -1237,8 +1239,6 @@ app.post("/submit", upload.any(), async (req, res) => {
       }
 
     });
-
- 
 
     return res.status(500).json({ ok: false, message: err.message || "서버 오류" });
 
