@@ -1,5 +1,7 @@
 const express = require("express");
 
+const { runDocVerification } = require('./verify.js');
+
 const cors = require("cors");
 
 const multer = require("multer");
