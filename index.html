@@ -66,11 +66,17 @@
 
     .col-4{grid-template-columns:repeat(4,minmax(0,1fr))}
 
+    .col-1-1{grid-template-columns:repeat(2,minmax(0,1fr))}
+
+    .col-1-2{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+
     .col-2-1{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 
     .col-1-1-2{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,2fr)}
 
     .col-2-1-1{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)}
+
+    .sub-grid{display:grid;gap:10px;height:100%}
 
     label{display:block}
 
@@ -90,7 +96,7 @@
 
     .help{position:relative;display:inline-flex;width:14px;height:14px;align-items:center;justify-content:center;border:1px solid #cbd5e1;border-radius:50%;color:#475569;background:white;font-size:9px;cursor:help;flex-shrink:0}
 
-    .help:hover:after{content:attr(data-help);position:absolute;left:50%;top:18px;transform:translateX(-50%);z-index:20;width:260px;padding:8px;border-radius:9px;background:#0f172a;color:#fff;font-size:10px;font-weight:500;line-height:1.5;white-space:pre-line;box-shadow:0 8px 20px rgba(15,23,42,.25)}
+    .help:hover:after{content:attr(data-help);position:absolute;left:50%;top:18px;transform:translateX(-50%);z-index:20;width:260px;padding:8px;border-radius:99px;background:#0f172a;color:#fff;font-size:10px;font-weight:500;line-height:1.5;white-space:pre-line;box-shadow:0 8px 20px rgba(15,23,42,.25)}
 
     .sales-wrap{position:relative}
 
@@ -130,7 +136,7 @@
 
     .file-group-items{display:grid;gap:6px}
 
-    .file-box{border:1px solid #e2e8f0;border-radius:9px;padding:7px;background:white}
+    .file-box{border:1px solid #e2e8f0;border-radius:99px;padding:7px;background:white}
 
     .file-title{font-size:11px;font-weight:800;margin-bottom:4px;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 
@@ -418,67 +424,103 @@
 
         </div>
 
+       
+
         <div class="sec-divider"></div>
+
+       
+
+        <!-- ⚙️ 대칭형 도급 작업 정보 섹션 (수정된 그리드 시스템) -->
 
         <div class="sec-title">⚙️ 도급 작업 정보</div>
 
-        <div class="row col-2-1">
+        <div class="row col-1-1">
 
-          <label>
+          <!-- 좌측 그룹: 도급내용 = 작업인원 + 취급물질 -->
 
-            <div class="label-row">도급내용(계약서명) <span class="req">*</span></div>
+          <div class="sub-grid">
 
-            <input id="contractTitle" name="contractTitle" required placeholder="계약서명 또는 도급 작업명">
+            <label>
 
-            <div class="error-text" id="contractTitleError"></div>
+              <div class="label-row">도급내용(계약서명) <span class="req">*</span></div>
 
-          </label>
+              <input id="contractTitle" name="contractTitle" required placeholder="계약서명 또는 도급 작업명">
 
-          <label>
+              <div class="error-text" id="contractTitleError"></div>
 
-            <div class="label-row">공사시작 예정일 <span class="req">*</span><span class="help" data-help="오늘 기준 최소 3일 이후 날짜만 선택 가능합니다.">!</span></div>
+            </label>
 
-            <input id="contractStart" name="contractStart" required type="date">
+            <div class="row col-1-2" style="margin-bottom:0;">
 
-            <div class="error-text" id="contractStartError"></div>
+              <label>
 
-          </label>
+                <div class="label-row">작업인원 <span class="req">*</span></div>
+
+                <input id="workerCount" name="workerCount" required type="number" min="1" placeholder="예: 5">
+
+                <div class="error-text" id="workerCountError"></div>
+
+              </label>
+
+              <label>
+
+                <div class="label-row">취급물질 <span class="req">*</span></div>
+
+                <input id="handlingMaterials" name="handlingMaterials" required placeholder="자동 입력" readonly class="readonly-field">
+
+                <div class="error-text" id="handlingMaterialsError"></div>
+
+              </label>
+
+            </div>
+
+          </div>
+
+ 
+
+          <!-- 우측 그룹: 취급공정/시설 = 공사시작일 + 계약만료일 -->
+
+          <div class="sub-grid">
+
+            <div class="row col-1-1" style="margin-bottom:0;">
+
+              <label>
+
+                <div class="label-row">공사시작 예정일 <span class="req">*</span><span class="help" data-help="오늘 기준 최소 3일 이후 날짜만 선택 가능합니다.">!</span></div>
+
+                <input id="contractStart" name="contractStart" required type="date">
+
+                <div class="error-text" id="contractStartError"></div>
+
+              </label>
+
+              <label>
+
+                <div class="label-row">계약만료일 <span class="req">*</span><span class="help" data-help="공사시작 예정일 이후 날짜여야 합니다.">!</span></div>
+
+                <input id="contractEnd" name="contractEnd" required type="date">
+
+                <div class="error-text" id="contractEndError"></div>
+
+              </label>
+
+            </div>
+
+            <label>
+
+              <div class="label-row">취급공정/취급시설 <span class="req">*</span></div>
+
+              <input id="handlingProcess" name="handlingProcess" required placeholder="자동 입력" readonly class="readonly-field">
+
+              <div class="error-text" id="handlingProcessError"></div>
+
+            </label>
+
+          </div>
 
         </div>
 
-        <div class="row col-1-1-2">
-
-          <label>
-
-            <div class="label-row">작업인원 <span class="req">*</span></div>
-
-            <input id="workerCount" name="workerCount" required type="number" min="1" placeholder="예: 5">
-
-            <div class="error-text" id="workerCountError"></div>
-
-          </label>
-
-          <label>
-
-            <div class="label-row">취급물질 <span class="req">*</span></div>
-
-            <input id="handlingMaterials" name="handlingMaterials" required placeholder="자동 입력" readonly class="readonly-field">
-
-            <div class="error-text" id="handlingMaterialsError"></div>
-
-          </label>
-
-          <label>
-
-            <div class="label-row">취급공정/취급시설 <span class="req">*</span></div>
-
-            <input id="handlingProcess" name="handlingProcess" required placeholder="자동 입력" readonly class="readonly-field">
-
-            <div class="error-text" id="handlingProcessError"></div>
-
-          </label>
-
-        </div>
+ 
 
         <div class="steps-wrap">
 
@@ -501,6 +543,8 @@
           <div class="error-text" id="stepsError"></div>
 
         </div>
+
+       
 
         <div class="safety-wrap">
 
@@ -590,17 +634,17 @@
 
 const MATERIAL_PROCESS_MAP = {
 
-  HC:  {material:"시안 등 00종",   process:"㈜엘지화학_화치단지 유해화학물질 취급 전 공정"},
+  HC: {material:"시안 등 00종", process:"(주)엘지화학_화치단지 유해화학물질 취급 전 공정"},
 
-  YS1: {material:"벤젠 등 00종",   process:"㈜엘지화학_용성1단지 유해화학물질 취급 전 공정"},
+  YS1: {material:"벤젠 등 00종", process:"(주)엘지화학_용성1단지 유해화학물질 취급 전 공정"},
 
-  YS2: {material:"벤젠 등 00종",   process:"㈜엘지화학_용성2단지 유해화학물질 취급 전 공정"},
+  YS2: {material:"벤젠 등 00종", process:"(주)엘지화학_용성2단지 유해화학물질 취급 전 공정"},
 
-  YS:  {material:"벤젠 등 40종",   process:"㈜엘지화학_용성단지 유해화학물질 취급 전 공정"},
+  YS: {material:"벤젠 등 40종", process:"(주)엘지화학_용성단지 유해화학물질 취급 전 공정"},
 
-  SM:  {material:"스티렌 등 00종", process:"㈜엘지화학_SM단지 유해화학물질 취급 전 공정"},
+  SM: {material:"스티렌 등 00종", process:"(주)엘지화학_SM단지 유해화학물질 취급 전 공정"},
 
-  VCM: {material:"염소 등 00종",   process:"㈜엘지화학_VCM단지 유해화학물질 취급 전 공정"}
+  VCM: {material:"염소 등 00종", process:"(주)엘지화학_VCM단지 유해화학물질 취급 전 공정"}
 
 };
 
@@ -632,6 +676,8 @@ const requiredFields = [
 
   ["contractStart","공사시작 예정일"],
 
+  ["contractEnd","계약만료일"], // 👈 필수 검증 추가
+
   ["handlingMaterials","취급물질"],
 
   ["handlingProcess","취급공정/취급시설"],
@@ -654,23 +700,23 @@ const requiredFields = [
 
 const attachmentItems = [
 
-  {key:"businessLicense",       label:"사업자등록증",        required:true,  maxMB:1,  ext:["jpg","jpeg","png"], note:"이미지, 최대 1MB"},
+  {key:"businessLicense", label:"사업자등록증", required:true, maxMB:1, ext:["jpg","jpeg","png"], note:"이미지, 최대 1MB"},
 
-  {key:"vatCertificate",        label:"부가가치세표준증명원", required:true,  maxMB:1,  ext:["jpg","jpeg","png"], note:"이미지, 최대 1MB"},
+  {key:"vatCertificate", label:"부가가치세표준증명원", required:true, maxMB:1, ext:["jpg","jpeg","png"], note:"이미지, 최대 1MB"},
 
-  {key:"contract",              label:"계약서",               required:true,  maxMB:5,  ext:["pdf"],              note:"PDF, 최대 5MB"},
+  {key:"contract", label:"계약서", required:true, maxMB:5, ext:["pdf"], note:"PDF, 최대 5MB"},
 
-  {key:"pledge",                label:"확약서",               required:false, maxMB:1,  ext:["pdf"],              note:"PDF, 최대 1MB / 자동연장 조항 해당 시"},
+  {key:"pledge", label:"확약서", required:false, maxMB:1, ext:["pdf"], note:"PDF, 최대 1MB / 자동연장 조항 해당 시"},
 
-  {key:"manpowerList",          label:"수급인인력명세서",     required:true,  maxMB:1,  ext:["pdf"],              note:"PDF, 최대 1MB", dl:"./forms/manpower_list.xlsx"},
+  {key:"manpowerList", label:"수급인인력명세서", required:true, maxMB:1, ext:["pdf"], note:"PDF, 최대 1MB", dl:"./forms/manpower_list.xlsx"},
 
-  {key:"trainingCertificate",   label:"교육이수증",           required:true,  maxMB:20, ext:["pdf","zip"],        note:"PDF 또는 ZIP, 최대 20MB"},
+  {key:"trainingCertificate", label:"교육이수증", required:true, maxMB:20, ext:["pdf","zip"], note:"PDF 또는 ZIP, 최대 20MB"},
 
-  {key:"employmentCertificate", label:"재직증명서",           required:true,  maxMB:1,  ext:["pdf"],              note:"PDF, 최대 1MB"},
+  {key:"employmentCertificate", label:"재직증명서", required:true, maxMB:1, ext:["pdf"], note:"PDF, 최대 1MB"},
 
-  {key:"ppeList",               label:"보호구명세서",         required:true,  maxMB:1,  ext:["pdf"],              note:"PDF, 최대 1MB", dl:"./forms/ppe_list.xlsx"},
+  {key:"ppeList", label:"보호구명세서", required:true, maxMB:1, ext:["pdf"], note:"PDF, 최대 1MB", dl:"./forms/ppe_list.xlsx"},
 
-  {key:"ppeCertificate",        label:"보호구인증서",         required:true,  maxMB:5,  ext:["pdf","zip"],        note:"PDF 또는 ZIP, 최대 5MB"}
+  {key:"ppeCertificate", label:"보호구인증서", required:true, maxMB:5, ext:["pdf","zip"], note:"PDF 또는 ZIP, 최대 5MB"}
 
 ];
 
@@ -680,11 +726,11 @@ const attachmentGroups = [
 
   {title:"사업자 관련 서류 (양식용)", keys:["businessLicense","vatCertificate"]},
 
-  {title:"계약 관련 서류",            keys:["contract","pledge"]},
+  {title:"계약 관련 서류", keys:["contract","pledge"]},
 
-  {title:"인력·교육 관련 서류",       keys:["manpowerList","trainingCertificate","employmentCertificate"]},
+  {title:"인력·교육 관련 서류", keys:["manpowerList","trainingCertificate","employmentCertificate"]},
 
-  {title:"보호구 관련 서류",          keys:["ppeList","ppeCertificate"]}
+  {title:"보호구 관련 서류", keys:["ppeList","ppeCertificate"]}
 
 ];
 
@@ -710,7 +756,27 @@ const minStart = formatDate(addDays(today,3));
 
 const startInput = document.getElementById("contractStart");
 
+const endInput = document.getElementById("contractEnd");
+
 startInput.min = minStart;
+
+ 
+
+// 공사시작일 변경 시 계약만료일 선택 범위 자동 조정
+
+startInput.addEventListener("change", function() {
+
+  if (this.value) {
+
+    endInput.min = this.value;
+
+  }
+
+  updateProgress();
+
+});
+
+endInput.addEventListener("change", updateProgress);
 
  
 
@@ -1024,6 +1090,14 @@ function validate(){
 
   }
 
+  if(startInput.value && endInput.value && endInput.value < startInput.value){
+
+    showErr("contractEnd","계약만료일은 공사시작 예정일 이후여야 합니다.");
+
+    missing.push("계약만료일 기간 오류");
+
+  }
+
   if(doneSteps()<5){
 
     const e = document.getElementById("stepsError");
@@ -1265,10 +1339,6 @@ document.getElementById("resetBtn").addEventListener("click",function(){
   initPage();
 
 });
-
- 
-
-startInput.addEventListener("change", updateProgress);
 
  
 
