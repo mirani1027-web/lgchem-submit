@@ -230,7 +230,7 @@ async function runDocVerification(files) {
 
     const response = await fetch(
 
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`,
 
       {
 
